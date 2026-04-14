@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Last Call — Player App (Truth-Pack Aware)</title>
+<style>
+:root{
+  --bg:#0b0d14; --panel:#131826; --panel2:#171d2d; --line:rgba(255,255,255,.12);
+  --text:#eef2ff; --muted:#a8b1cc; --accent:#ff4f93; --accent2:#ff8bb8;
+  --good:#21c27c; --warn:#ffbf47; --bad:#ff5d6c; --shadow:0 16px 40px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);
+  background:
+    radial-gradient(circle at top right, rgba(255,79,147,.18), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(126,182,255,.12), transparent 35%),
+    linear-gradient(180deg,#0c0f17,#090b11 55%,#07080d);
+  -webkit-tap-highlight-color:transparent;
+}
+button,input,select{font:inherit}
+button{border:0;border-radius:14px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:14px 16px;font-weight:800;cursor:pointer;box-shadow:0 10px 28px rgba(255,79,147,.25)}
+button.secondary{background:rgba(255,255,255,.06);color:var(--text);box-shadow:none;border:1px solid var(--line)}
+button.bad{background:linear-gradient(135deg,#ff6d7c,#d93a4a);box-shadow:0 10px 28px rgba(217,58,74,.28)}
+button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);padding:14px;border-radius:14px}
+.app{min-height:100dvh;display:flex;justify-content:center;padding:18px}
+.shell{width:min(100%,430px);min-height:calc(100dvh - 36px);border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));backdrop-filter:blur(10px);border-radius:28px;box-shadow:var(--shadow);overflow:hidden;position:relative}
+.topbar{padding:14px 16px 10px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0))}
+.statusline{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.title{font-size:20px;font-weight:900;line-height:1.1}
+.subtitle{margin-top:4px;color:var(--muted);font-size:13px}
+.screen{display:none;padding:16px;min-height:calc(100dvh - 120px)}
+.screen.active{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:14px}
+.card h2,.card h3{margin:0 0 10px 0;font-size:18px}
+.tiny{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:800}
+.body{line-height:1.55;font-size:15px}
+.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:800}
+.mini{font-size:12px;color:var(--muted);line-height:1.5}
+.roles{display:grid;gap:12px}
+.role-card{padding:14px;border-radius:18px;background:var(--panel);border:1px solid var(--line)}
+.role-card h3{margin:0 0 6px 0;font-size:17px}
+.role-card .meta{color:var(--muted);font-size:13px;line-height:1.45;margin-bottom:12px}
+.home-hero{background:linear-gradient(135deg, rgba(255,79,147,.16), rgba(126,182,255,.10));border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:16px;margin-bottom:16px}
+.hero-grid{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.badge{padding:8px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:800;background:rgba(255,255,255,.04)}
+.timer{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
+.timer-pill{padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:12px;color:var(--muted);font-weight:700}
+.home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.icon{position:relative;min-height:94px;background:var(--panel2);border:1px solid var(--line);border-radius:22px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;text-align:center;padding:10px 8px}
+.icon-symbol{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.08);font-size:22px}
+.icon-label{font-size:12px;font-weight:800;color:var(--text)}
+.icon.disabled{opacity:.45}
+.icon .badge-count{position:absolute;top:8px;right:8px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:grid;place-items:center;background:var(--accent);color:white;font-size:11px;font-weight:900;box-shadow:0 6px 16px rgba(255,79,147,.32)}
+.navline{display:flex;gap:8px;overflow:auto;padding-bottom:2px;margin-bottom:14px}
+.navline button{white-space:nowrap;padding:10px 12px;border-radius:999px;font-size:12px}
+.entry{padding:14px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.03);margin-bottom:12px}
+.entry-title{font-weight:900;margin-bottom:6px;font-size:14px}
+.entry-meta{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.45}
+.entry-body{white-space:pre-wrap;line-height:1.55;font-size:14px}
+.empty{text-align:center;color:var(--muted);padding:20px 10px;line-height:1.5}
+.notification-stack{position:fixed;left:50%;transform:translateX(-50%);top:10px;width:min(92vw,420px);z-index:9999;pointer-events:none}
+.banner{margin-bottom:10px;background:rgba(18,22,34,.96);border:1px solid rgba(255,255,255,.11);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow)}
+.banner-title{font-weight:900;font-size:13px;margin-bottom:4px}
+.banner-body{font-size:13px;color:var(--muted)}
+.result-overlay{position:fixed;inset:0;background:rgba(5,7,12,.82);backdrop-filter:blur(6px);z-index:8000;display:none;align-items:center;justify-content:center;padding:18px}
+.result-overlay.show{display:flex}
+.result-card{width:min(100%,420px);background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.12);border-radius:26px;padding:22px;box-shadow:var(--shadow);text-align:center}
+.result-title{font-size:30px;font-weight:900;margin-bottom:10px}
+.result-tag{display:inline-block;padding:8px 12px;border-radius:999px;border:1px solid var(--line);margin:8px 0 14px;font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+.result-tag.good{background:rgba(33,194,124,.12);color:#90ffd0}
+.result-tag.warn{background:rgba(255,191,71,.12);color:#ffd58b}
+.result-tag.bad{background:rgba(255,93,108,.12);color:#ffb1b9}
+.answer-list{display:grid;gap:10px;margin-top:10px}
+.answer{width:100%;text-align:left;background:rgba(255,255,255,.04);border:1px solid var(--line);box-shadow:none;padding:13px 14px;border-radius:16px}
+.answer.selected{background:rgba(255,79,147,.14);border-color:rgba(255,79,147,.48)}
+.share-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
+.lobby-meta{display:grid;gap:10px}
+</style>
+</head>
+<body>
+<div class="notification-stack" id="notificationStack"></div>
+<div class="result-overlay" id="resultOverlay"><div class="result-card" id="resultCard"></div></div>
+
+<div class="app">
+  <div class="shell">
+    <div class="topbar">
+      <div class="statusline">
+        <div id="topPhase">Lobby</div>
+        <div id="topClock">00:00</div>
+      </div>
+      <div class="title">Last Call</div>
+      <div class="subtitle">Connected Player App — Truth-Pack Aware</div>
+    </div>
+
+    <section class="screen active" id="screen-connect">
+      <div class="card">
+        <h2>Connect to Session</h2>
+        <div class="body">Enter the host session code, then pick your table and role. This app reads answer choices, clues, and results from the backend.</div>
+      </div>
+      <div class="field"><div class="label">Game Backend</div><select id="backendPreset"></select></div>
+      <div class="field"><div class="label">Backend Base URL</div><input id="backendUrl" value="https://last-call-backend-rnc8.onrender.com" /></div>
+      <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
+      <button id="findSessionBtn">Find Session</button>
+      <div class="mini" style="margin-top:12px"><label><input type="checkbox" id="soundToggle" checked style="width:auto;margin-right:6px"> Notification sound on</label></div>
+    </section>
+
+    <section class="screen" id="screen-join">
+      <div class="card">
+        <div class="tiny">Session</div>
+        <h2 id="joinSessionTitle">Last Call</h2>
+        <div class="body" id="joinSessionMeta"></div>
+      </div>
+      <div class="field"><div class="label">Table</div><select id="tableSelect"></select></div>
+            <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
+      <div class="field"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
+      <button id="joinTableBtn" disabled>Claim Role & Join</button>
+    </section>
+
+    <section class="screen" id="screen-home">
+      <div class="home-hero">
+        <div class="hero-grid">
+          <div>
+            <div class="tiny">Player</div>
+            <div class="title" id="heroPlayer"></div>
+            <div class="subtitle" id="heroRole"></div>
+          </div>
+          <div class="badge" id="phaseBadge">Lobby</div>
+        </div>
+        <div class="timer">
+          <div class="timer-pill" id="timeRemaining">Time Left — 45:00</div>
+          <div class="timer-pill" id="rolePrompt">Waiting for host start.</div>
+        </div>
+      </div>
+      <div class="home-grid" id="homeGrid"></div>
+      <div class="card"><div class="tiny">Host Help</div><div class="body"><button class="secondary" id="helpButton">Help</button> <span id="helpStatusText" class="mini"></span></div></div>
+      <div class="card">
+        <div class="tiny">Connection</div>
+        <div class="body" id="connectionMeta">Not connected.</div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-app">
+      <div class="navline">
+        <button class="secondary" id="backHomeBtn">Home</button>
+        <button class="secondary" id="openAccuseBtn">Accuse</button>
+      </div>
+      <div class="card">
+        <div class="tiny" id="appTiny">App</div>
+        <h2 id="appTitle">Messages</h2>
+        <div class="body" id="appDescription"></div>
+      </div>
+      <div id="appEntries"></div>
+      <div id="appExtra"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'last_call_connected_player_truthpacks_v1';
+  const APP_META = {
+    phone:{label:'Phone',icon:'📞',desc:'Calls, missed calls, and recent contact timing.'},
+    messages:{label:'Messages',icon:'💬',desc:'Texts, DMs, deleted fragments, and private threads.'},
+    maps:{label:'Maps',icon:'🗺️',desc:'Route pings, movement, and location clues.'},
+    bank:{label:'Bank',icon:'🏦',desc:'Pending charges, transfers, debt, withdrawals, and timeline-linked purchases.'},
+    photos:{label:'Photos',icon:'📸',desc:'Images, screenshots, and visual clues.'},
+    social:{label:'Social',icon:'🌐',desc:'Stories, posts, reactions, and public pressure.'},
+    contacts:{label:'Contacts',icon:'👥',desc:'Saved names, aliases, favorites, and hidden closeness.'},
+    notes:{label:'Notes',icon:'📝',desc:'Private notes, reminders, public clues, and coded thoughts.'},
+    files:{label:'Files',icon:'📂',desc:'Documents, records, logs, and internal proof.'},
+    browser:{label:'Browser',icon:'🧭',desc:'Search history, open tabs, and intent clues.'},
+    accuse:{label:'Accuse',icon:'⚖️',desc:'Submit your final accusation in the last 15 minutes.'}
+  };
+  const ROLE_LABELS = {bartender:'Bartender',security:'Security',host:'Karaoke Host',manager:'Manager',ex_lover:'Ex-Lover',sound_tech:'Sound Tech'};
+  const DEFAULT_ANSWERS = {
+    killer:['Bartender','Security','Karaoke Host','Manager','Ex-Lover','Sound Tech'],
+    motive:[], method:[], evidence:[]
+  };
+  const state = {
+    backendUrl:'http://localhost:3000',
+    session:null, tableId:'', selectedRoleId:'', playerName:'', instagramTag:'', playerId:'',
+    privateView:null, currentScreen:'connect', currentApp:'', viewed:{}, ws:null,
+    accusationDraft:{killer:null,motive:null,method:null,evidence:null},
+    soundEnabled:true,
+    lastUnlockCount:0
+  };
+  const el = {
+    notificationStack:document.getElementById('notificationStack'),
+    resultOverlay:document.getElementById('resultOverlay'),
+    resultCard:document.getElementById('resultCard'),
+    topPhase:document.getElementById('topPhase'),
+    topClock:document.getElementById('topClock'),
+    backendUrl:document.getElementById('backendUrl'),
+    backendPreset:document.getElementById('backendPreset'),
+    sessionCodeInput:document.getElementById('sessionCodeInput'),
+    findSessionBtn:document.getElementById('findSessionBtn'),
+    joinSessionTitle:document.getElementById('joinSessionTitle'),
+    joinSessionMeta:document.getElementById('joinSessionMeta'),
+    tableSelect:document.getElementById('tableSelect'),
+    instagramInput:document.getElementById('instagramInput'),
+    roleList:document.getElementById('roleList'),
+    joinTableBtn:document.getElementById('joinTableBtn'),
+    heroPlayer:document.getElementById('heroPlayer'),
+    heroRole:document.getElementById('heroRole'),
+    phaseBadge:document.getElementById('phaseBadge'),
+    timeRemaining:document.getElementById('timeRemaining'),
+    rolePrompt:document.getElementById('rolePrompt'),
+    homeGrid:document.getElementById('homeGrid'),
+    connectionMeta:document.getElementById('connectionMeta'),
+    backHomeBtn:document.getElementById('backHomeBtn'),
+    openAccuseBtn:document.getElementById('openAccuseBtn'),
+    appTiny:document.getElementById('appTiny'),
+    appTitle:document.getElementById('appTitle'),
+    appDescription:document.getElementById('appDescription'),
+    appEntries:document.getElementById('appEntries'),
+    appExtra:document.getElementById('appExtra'),
+    soundToggle:document.getElementById('soundToggle'),
+    helpButton:document.getElementById('helpButton'),
+    helpStatusText:document.getElementById('helpStatusText'),
+  };
+
+  function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify({backendUrl:state.backendUrl,session:state.session,tableId:state.tableId,selectedRoleId:state.selectedRoleId,playerName:state.playerName,instagramTag:state.instagramTag,playerId:state.playerId,viewed:state.viewed,accusationDraft:state.accusationDraft,soundEnabled:state.soundEnabled}))}
+  function load(){const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return; try{Object.assign(state, JSON.parse(raw));}catch{}}
+  function resetLocal(){localStorage.removeItem(STORAGE_KEY); location.reload();}
+  function escapeHtml(str){return String(str ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function toast(title, body=''){const div=document.createElement('div'); div.className='banner'; div.innerHTML=`<div class="banner-title">${escapeHtml(title)}</div><div class="banner-body">${escapeHtml(body)}</div>`; el.notificationStack.appendChild(div); setTimeout(()=>{div.style.opacity='0';div.style.transform='translateY(-6px)'},2600); setTimeout(()=>div.remove(),3000);}
+  function playNotificationSound(){
+    if(!state.soundEnabled) return;
+    try{
+      const ctx=new (window.AudioContext || window.webkitAudioContext)();
+      const o=ctx.createOscillator();
+      const g=ctx.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(900, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(680, ctx.currentTime + 0.08);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.17);
+    }catch{}
+  }
+
+  function checkForNewUnlocks(privateView){
+    const apps = privateView?.apps || {};
+    let count = (privateView?.publicClues || []).length;
+    Object.values(apps).forEach(arr => count += (arr || []).length);
+    if(state.lastUnlockCount && count > state.lastUnlockCount){
+      playNotificationSound();
+      toast('New clue unlocked');
+    }
+    state.lastUnlockCount = count;
+  }
+
+  async function api(path, opts={}){const url=`${state.backendUrl}${path}`; const res=await fetch(url,{headers:{'Content-Type':'application/json'},...opts}); if(!res.ok){const text=await res.text(); throw new Error(text || `Request failed: ${res.status}`)} return res.json();}
+  function switchScreen(name){state.currentScreen=name; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(`screen-${name}`).classList.add('active'); if(name==='join')renderJoin(); if(name==='home')renderHome(); if(name==='app')renderApp(); save();}
+  function currentTable(){return (state.session?.tables || []).find(t => t.tableId === state.tableId) || null}
+  function answerChoices(){return state.privateView?.answerChoices || DEFAULT_ANSWERS}
+  function renderJoin(){
+    if(!state.session) return;
+    el.joinSessionTitle.textContent = state.session.title || 'Last Call';
+    const table = currentTable();
+    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Role:</strong> ${escapeHtml(ROLE_LABELS[state.selectedRoleId] || 'Not selected')}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
+    if(!state.tableId && state.session.tables?.length) state.tableId = state.session.tables[0].tableId;
+    el.tableSelect.innerHTML = (state.session.tables || []).map(t => `<option value="${t.tableId}" ${state.tableId===t.tableId?'selected':''}>${escapeHtml(t.label)} — ${escapeHtml(t.truthPackId || 'version_a')} — ${escapeHtml(t.phase)}</option>`).join('');
+    el.playerNameInput.value = state.playerName || '';
+    el.instagramInput.value = state.instagramTag || '';
+    renderRoleList();
+    updateJoinButton();
+  }
+  function renderRoleList(){
+    const table=currentTable(); const claims=table?.roleClaims || [];
+    el.roleList.innerHTML = claims.map(role => {
+      const disabled = role.claimed; const selected = state.selectedRoleId === role.roleId;
+      return `<div class="role-card"><h3>${escapeHtml(role.roleLabel)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
+    }).join('');
+    el.roleList.querySelectorAll('[data-role]').forEach(btn => { btn.onclick = () => { state.selectedRoleId = btn.getAttribute('data-role'); renderRoleList(); updateJoinButton(); save(); }; });
+  }
+  function updateJoinButton(){el.joinTableBtn.disabled = !(state.selectedRoleId && state.tableId)}
+  async function findSession(){
+    state.backendUrl = el.backendUrl.value.trim().replace(/\/$/, '');
+    const code = el.sessionCodeInput.value.trim().toUpperCase();
+    if(!code){toast('Missing code','Enter the host session code.'); return;}
+    const data = await api(`/api/sessions/by-code/${encodeURIComponent(code)}`);
+    state.session = data;
+    if (data.backendOptions) state.backendOptions = data.backendOptions;
+    if(!state.tableId && data.tables?.length) state.tableId = data.tables[0].tableId;
+    switchScreen('join'); connectWs(); toast('Session found', data.code);
+  }
+  async function joinTable(){
+    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId})});
+    state.playerId = data.player.playerId; state.privateView = data; switchScreen('home'); toast('Joined table', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
+  }
+  async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; renderCurrent();}
+  function wsUrlFromHttp(httpUrl){const u=new URL(httpUrl); u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'; u.pathname=''; u.search=''; u.hash=''; return u.toString().replace(/\/$/,'');}
+  function connectWs(){
+    if(!state.session?.sessionId) return;
+    if(state.ws){state.ws.close(); state.ws=null;}
+    const url = `${wsUrlFromHttp(state.backendUrl)}?sessionId=${encodeURIComponent(state.session.sessionId)}`;
+    try{
+      const ws = new WebSocket(url); state.ws = ws;
+      ws.onopen = () => toast('Connected','Live updates are on.');
+      ws.onmessage = async (event) => { let msg={}; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset'].includes(msg.type)){ await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ toast('Table reset','Host reset the table.'); }} };
+    }catch{}
+  }
+  async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
+  function currentPhase(){ return state.privateView?.phase || currentTable()?.phase || 'lobby'; }
+  function elapsedSec(){ return state.privateView?.elapsedSec || currentTable()?.timers?.elapsedSec || 0; }
+  function formatClock(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+  function timeRemainingSec(){ return Math.max(0, 2700 - elapsedSec()); }
+  function renderHome(){
+    const pv=state.privateView;
+    el.heroPlayer.textContent = pv?.tableLabel || currentTable()?.label || 'Team';
+    const roleLabel = pv?.player?.roleLabel || ROLE_LABELS[state.selectedRoleId] || 'Role';
+    const roleName = pv?.player?.roleInfo?.character_name || '';
+    el.heroRole.textContent = roleName ? `${roleLabel} — ${roleName}` : roleLabel;
+    el.phaseBadge.textContent = currentPhase();
+    el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
+    el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
+    const hostMessageCount = (pv?.hostMessages || []).length;
+    el.connectionMeta.textContent = `Backend: ${state.backendUrl} · Session: ${state.session?.code || '—'} · Team: ${currentTable()?.label || '—'} · Messages: ${hostMessageCount} · Player ID: ${state.playerId || '—'}`;
+    if (el.helpStatusText) { el.helpStatusText.textContent = pv?.helpRequest && pv.helpRequest.status === 'open' ? 'Help requested' : ''; }
+    const apps=Object.keys(APP_META);
+    el.homeGrid.innerHTML = apps.map(appId => {
+      const locked = appId==='accuse' && !currentPhase().startsWith('accusation');
+      const count = unreadCount(appId);
+      return `<button class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
+    }).join('');
+    el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => { btn.onclick = () => { const appId=btn.getAttribute('data-open-app'); if(appId==='accuse' && !currentPhase().startsWith('accusation')){ toast('Accuse locked','This opens during accusation phase.'); return; } state.currentApp=appId; switchScreen('app'); }; });
+  }
+  function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
+  function renderApp(){
+    const appId = state.currentApp || 'messages'; const meta=APP_META[appId];
+    el.appTiny.textContent = currentPhase();
+    el.appTitle.textContent = meta.label;
+    el.appDescription.textContent = meta.desc;
+    if(appId==='accuse'){ el.appEntries.innerHTML = renderAccuseApp(); el.appExtra.innerHTML=''; state.viewed[appId]=1; bindAccuseButtons(); save(); return; }
+    const entries=[...(state.privateView?.apps?.[appId] || [])];
+    const publicClues=appId==='notes' ? [...(state.privateView?.publicClues || [])] : [];
+    let html='';
+    if(publicClues.length){ html += `<div class="card"><div class="tiny">Public Clues</div><div class="body">These clues were released to everyone in the room.</div></div>`; publicClues.forEach(clue => { html += `<div class="entry"><div class="entry-title">Public Clue</div><div class="entry-meta">Unlocked at ${formatClock(clue.unlockedAtSec || 0)}</div><div class="entry-body">${escapeHtml(clue.text)}</div></div>`; }); }
+    entries.forEach(entry => { html += `<div class="entry"><div class="entry-title">${escapeHtml(entry.title)}</div><div class="entry-meta">${escapeHtml(meta.label)} · unlocked at ${formatClock(entry.unlockedAtSec || 0)}</div><div class="entry-body">${escapeHtml(entry.content)}</div></div>`; });
+    if(!html) html = `<div class="empty">No clues here yet. Wait for the next unlock, or check another app.</div>`;
+    el.appEntries.innerHTML = html;
+    const roleInfo=state.privateView?.player?.roleInfo;
+    el.appExtra.innerHTML = roleInfo ? `<div class="card"><div class="tiny">Your Investigation Lane</div><div class="body"><strong>What I know:</strong> ${escapeHtml(roleInfo.what_i_know || '—')}<br><br><strong>What I’m hiding:</strong> ${escapeHtml(roleInfo.what_im_hiding || '—')}<br><br><strong>What I need:</strong> ${escapeHtml(roleInfo.what_i_need || '—')}</div></div>` : '';
+    state.viewed[appId] = entries.length + publicClues.length; save();
+  }
+  function renderAccuseApp(){
+    if(!currentPhase().startsWith('accusation')) return `<div class="empty">Accuse opens during accusation phase.</div>`;
+    if(state.privateView?.player?.submittedAt) return `<div class="empty">Your final accusation is locked in.</div>`;
+    const choices = answerChoices();
+    return `<div class="card"><div class="tiny">Final Accusation</div><div class="body">Choose carefully. This submission is final once sent to the backend.</div></div>`
+      + renderQuestionBlock('killer','Who killed Nico Vale?', choices.killer || DEFAULT_ANSWERS.killer)
+      + renderQuestionBlock('motive','Why did they do it?', choices.motive || [])
+      + renderQuestionBlock('method','How was Nico killed?', choices.method || [])
+      + renderQuestionBlock('evidence','What is the strongest evidence?', choices.evidence || [])
+      + `<button id="submitAccuseBtn" ${canSubmitAccuse() ? '' : 'disabled'}>Submit Final Accusation</button>`;
+  }
+  function renderQuestionBlock(key,prompt,options){ return `<div class="card"><h3>${escapeHtml(prompt)}</h3><div class="answer-list">${options.map(opt => `<button class="answer ${state.accusationDraft[key]===opt?'selected':''}" data-accuse-key="${key}" data-accuse-val="${encodeURIComponent(opt)}">${escapeHtml(opt)}</button>`).join('')}</div></div>`; }
+  function bindAccuseButtons(){
+    el.appEntries.querySelectorAll('[data-accuse-key]').forEach(btn => { btn.onclick = () => { const key=btn.getAttribute('data-accuse-key'); const val=decodeURIComponent(btn.getAttribute('data-accuse-val')); state.accusationDraft[key]=val; renderApp(); }; });
+    const submitBtn=document.getElementById('submitAccuseBtn');
+    if(submitBtn){ submitBtn.onclick = async () => { try{ await submitAccusation(); } catch(err){ toast('Submit failed', err.message); } }; }
+  }
+  function canSubmitAccuse(){ return ['killer','motive','method','evidence'].every(k => !!state.accusationDraft[k]); }
+  async function sendHelpRequest(reason='Need host', message=''){ await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/help-request`, { method:'POST', body: JSON.stringify({ reason, message }) }); toast('Help request sent'); await refreshSessionAndPlayer(); }
+
+  async function submitAccusation(){
+    const res = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}/accuse`, {method:'POST', body:JSON.stringify(state.accusationDraft)});
+    toast('Accusation submitted', res.result?.tier || 'submitted');
+    await refreshPlayerState();
+    showResultFromBackend(res.result);
+  }
+  function showResultFromBackend(result){
+    if(!result) return;
+    const tier=result.tier;
+    const map={perfect_solve:['Case Solved','good','You got the killer, motive, method, and strongest evidence right.'], solved:['Case Solved','good','You identified the killer and built a strong case.'], partial:['Close, but incomplete','warn','You found part of the truth, but not enough to close the case.'], failed:['Case Unsolved','bad','The room got loud, and the truth slipped past you.']};
+    const [title,cls,sub]=map[tier] || map.failed;
+    const win=tier==='perfect_solve' || tier==='solved';
+    const name=state.privateView?.player?.playerName || state.playerName || 'Player';
+    const roleLabel=state.privateView?.player?.roleLabel || ROLE_LABELS[state.selectedRoleId] || 'Role';
+    const caption=state.instagramTag?.trim() ? `${name} (${state.instagramTag}) solved Last Call: Who Killed the Singer? at Bar Fly Mystery. #BarFlyMystery #${roleLabel.replace(/\s+/g,'')}` : `${name} solved Last Call: Who Killed the Singer? at Bar Fly Mystery. #BarFlyMystery #${roleLabel.replace(/\s+/g,'')}`;
+    const key=result.key || {};
+    el.resultCard.innerHTML = `<div class="result-title">${escapeHtml(win ? `Congratulations, ${name}` : title)}</div><div class="result-tag ${cls}">${escapeHtml(title)}</div><div class="body">${escapeHtml(sub)}</div><div class="card" style="text-align:left;margin:14px 0 0 0"><div class="tiny">Backend Result</div><div class="body"><strong>Correct answers:</strong> ${result.correct || 0}/4<br><strong>Solve Tier:</strong> ${escapeHtml(result.tier || '—')}<br><br><strong>Killer:</strong> ${escapeHtml(key.killer || '—')}<br><strong>Motive:</strong> ${escapeHtml(key.motive || '—')}<br><strong>Method:</strong> ${escapeHtml(key.method || '—')}<br><strong>Evidence:</strong> ${escapeHtml(key.evidence || '—')}</div></div>${win ? `<div class="share-actions"><button class="secondary" id="copyCaptionBtn">Copy Instagram Caption</button><button class="secondary" id="downloadStoryBtn">Download Story Graphic</button></div>` : ''}<div class="share-actions"><button id="closeResultBtn">Close</button><button class="bad" id="resetLocalBtn">Reset Local App</button></div>`;
+    el.resultOverlay.classList.add('show');
+    const copyBtn=document.getElementById('copyCaptionBtn'); if(copyBtn) copyBtn.onclick=async()=>{ try{ await navigator.clipboard.writeText(caption); toast('Caption copied'); } catch { prompt('Copy this caption:', caption); } };
+    const storyBtn=document.getElementById('downloadStoryBtn'); if(storyBtn) storyBtn.onclick=downloadStoryGraphic;
+    document.getElementById('closeResultBtn').onclick=()=>{el.resultOverlay.classList.remove('show');};
+    document.getElementById('resetLocalBtn').onclick=resetLocal;
+  }
+  function showReveal(reveal){
+    if(!reveal) return;
+    el.resultCard.innerHTML = `<div class="result-title">Case Reveal</div><div class="body"><strong>Killer:</strong> ${escapeHtml(reveal.killer || '—')}<br><br><strong>Motive:</strong> ${escapeHtml(reveal.motive || '—')}<br><br><strong>Method:</strong> ${escapeHtml(reveal.method || '—')}<br><br><strong>Strongest Evidence:</strong> ${escapeHtml(reveal.strongestEvidence || '—')}</div><div class="card" style="text-align:left;margin:14px 0 0 0"><div class="tiny">Reveal Copy</div><div class="body">${escapeHtml(reveal.revealCopy || '—')}</div></div><div class="share-actions"><button id="closeRevealBtn">Close</button></div>`;
+    el.resultOverlay.classList.add('show');
+    document.getElementById('closeRevealBtn').onclick=()=>{el.resultOverlay.classList.remove('show');};
+  }
+  function downloadStoryGraphic(){
+    const canvas=document.createElement('canvas'); canvas.width=1080; canvas.height=1920; const ctx=canvas.getContext('2d');
+    const grad=ctx.createLinearGradient(0,0,0,canvas.height); grad.addColorStop(0,'#1a1028'); grad.addColorStop(1,'#090b12'); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+    roundRect(ctx,70,140,940,1640,36); ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=3; roundRect(ctx,70,140,940,1640,36); ctx.stroke();
+    const name=state.privateView?.player?.playerName || state.playerName || 'Player'; const roleLabel=state.privateView?.player?.roleLabel || ROLE_LABELS[state.selectedRoleId] || 'Role';
+    ctx.textAlign='center'; ctx.fillStyle='#ffbfd7'; ctx.font='700 34px Arial'; ctx.fillText('BAR FLY MYSTERY',540,230);
+    ctx.fillStyle='#ffffff'; ctx.font='900 92px Arial'; ctx.fillText('LAST CALL',540,360);
+    ctx.fillStyle='#d7ddff'; ctx.font='600 40px Arial'; ctx.fillText('WHO KILLED THE SINGER?',540,430);
+    ctx.fillStyle='#ffffff'; ctx.font='800 66px Arial'; wrapCenterText(ctx,name,540,650,780,78);
+    ctx.fillStyle='#ffbfd7'; ctx.font='800 48px Arial'; ctx.fillText('CASE SOLVED',540,900);
+    ctx.fillStyle='#ffffff'; ctx.font='700 44px Arial'; ctx.fillText(roleLabel.toUpperCase(),540,990);
+    if(state.instagramTag?.trim()){ ctx.fillStyle='#d7ddff'; ctx.font='600 34px Arial'; ctx.fillText(state.instagramTag.trim(),540,1080); }
+    ctx.fillStyle='#ffffff'; ctx.font='700 34px Arial'; ctx.fillText('#BarFlyMystery',540,1540);
+    const a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=`${name.replace(/[^a-z0-9]+/gi,'_')}_last_call_story.png`; a.click();
+  }
+  function roundRect(ctx,x,y,w,h,r){ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();}
+  function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
+  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home') renderHome(); if(state.currentScreen==='app') renderApp(); save(); }
+  function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
+  function bind(){
+    load();
+    el.backendUrl.value=state.backendUrl || 'http://localhost:3000';
+    el.instagramInput.value=state.instagramTag || '';
+    if(el.soundToggle){ el.soundToggle.checked = state.soundEnabled; el.soundToggle.onchange = () => { state.soundEnabled = el.soundToggle.checked; save(); }; }
+    if(el.backendPreset){ el.backendPreset.innerHTML = (state.backendOptions || []).map(opt => `<option value="${opt.url}">${opt.label}</option>`).join('') + `<option value="__custom__">Custom</option>`; const match=(state.backendOptions || []).find(opt => opt.url===state.backendUrl); el.backendPreset.value=match ? match.url : '__custom__'; el.backendPreset.onchange=()=>{ if(el.backendPreset.value !== '__custom__'){ el.backendUrl.value=el.backendPreset.value; state.backendUrl=el.backendPreset.value; save(); } }; }
+    if(el.helpButton){ el.helpButton.onclick = async () => { try { const reason = prompt('Reason for help?', 'Need host') || 'Need host'; const message = prompt('Optional message', '') || ''; await sendHelpRequest(reason, message); } catch(err) { toast('Help request failed', err.message); } }; }
+    el.findSessionBtn.onclick=async()=>{ try{ state.backendUrl=el.backendUrl.value.trim().replace(/\/$/,''); await findSession(); } catch(err){ toast('Find session failed', err.message); } };
+    el.tableSelect.onchange=()=>{ state.tableId=el.tableSelect.value; renderJoin(); save(); };
+    el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
+    el.joinTableBtn.onclick=async()=>{ try{ await joinTable(); } catch(err){ toast('Join failed', err.message); } };
+    el.backHomeBtn.onclick=()=>switchScreen('home');
+    el.openAccuseBtn.onclick=()=>{ state.currentApp='accuse'; switchScreen('app'); };
+    if(state.session?.sessionId){ connectWs(); if(state.playerId && state.tableId){ refreshSessionAndPlayer().catch(()=>{}); switchScreen('home'); } else { switchScreen('join'); } } else { switchScreen('connect'); }
+    setInterval(()=>{ renderCurrent(); },1000);
+  }
+  bind();
+})();
+</script>
+</body>
+</html>
