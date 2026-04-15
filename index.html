@@ -100,9 +100,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the host session code, then pick your table and role. This app reads answer choices, clues, and results from the backend.</div><div class="mini" style="margin-top:10px">If this device gets stuck in an old session, use Reset Session.</div>
+        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">If this device gets stuck in an old session, use Reset Session.</div>
       </div>
-      <div class="field"><div class="label">Backend Base URL</div><input id="backendUrl" value="http://localhost:3000" /></div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn">Find Session</button><button class="secondary" id="resetSessionBtn">Reset Session</button></div>
       <div class="mini" style="margin-top:12px"><label><input type="checkbox" id="soundToggle" checked style="width:auto;margin-right:6px"> Notification sound on</label></div>
@@ -137,10 +136,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         </div>
       </div>
       <div class="home-grid" id="homeGrid"></div>
+      <div class="card" id="hostMessageCard" style="display:none"><div class="tiny">Host Message</div><div class="body" id="hostMessageBody"></div></div>
       <div class="card">
-        <div class="tiny">Connection</div>
-        <div class="body" id="connectionMeta">Not connected.</div>
-        <div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="leaveSessionBtn">Leave Session</button></div>
+        <div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="helpBtn">Help</button><button class="secondary" id="testSoundBtn">Test Sound</button><button class="secondary" id="leaveSessionBtn">Leave Session</button></div>
       </div>
     </section>
 
@@ -182,7 +180,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     motive:[], method:[], evidence:[]
   };
   const state = {
-    backendUrl:'http://localhost:3000',
+    backendUrl:'https://last-call-backend-rnc8.onrender.com',
     session:null, tableId:'', selectedRoleId:'', playerName:'', instagramTag:'', playerId:'',
     privateView:null, currentScreen:'connect', currentApp:'', viewed:{}, ws:null,
     accusationDraft:{killer:null,motive:null,method:null,evidence:null},
@@ -197,7 +195,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     resultCard:document.getElementById('resultCard'),
     topPhase:document.getElementById('topPhase'),
     topClock:document.getElementById('topClock'),
-    backendUrl:document.getElementById('backendUrl'),
     sessionCodeInput:document.getElementById('sessionCodeInput'),
     findSessionBtn:document.getElementById('findSessionBtn'),
     resetSessionBtn:document.getElementById('resetSessionBtn'),
@@ -214,7 +211,10 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     timeRemaining:document.getElementById('timeRemaining'),
     rolePrompt:document.getElementById('rolePrompt'),
     homeGrid:document.getElementById('homeGrid'),
-    connectionMeta:document.getElementById('connectionMeta'),
+    hostMessageCard:document.getElementById('hostMessageCard'),
+    hostMessageBody:document.getElementById('hostMessageBody'),
+    helpBtn:document.getElementById('helpBtn'),
+    testSoundBtn:document.getElementById('testSoundBtn'),
     leaveSessionBtn:document.getElementById('leaveSessionBtn'),
     backHomeBtn:document.getElementById('backHomeBtn'),
     openAccuseBtn:document.getElementById('openAccuseBtn'),
@@ -251,9 +251,11 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     const apps = privateView?.apps || {};
     let count = (privateView?.publicClues || []).length;
     Object.values(apps).forEach(arr => count += (arr || []).length);
+    count += (privateView?.hostMessages || []).length;
     if(state.lastUnlockCount && count > state.lastUnlockCount){
       playNotificationSound();
-      toast('New clue unlocked');
+      const latestHostMessage = (privateView?.hostMessages || []).slice(-1)[0];
+      toast(latestHostMessage?.message ? 'Host message' : 'New clue unlocked', latestHostMessage?.message || '');
     }
     state.lastUnlockCount = count;
   }
@@ -284,7 +286,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   function updateJoinButton(){el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId)}
   async function findSession(){
-    state.backendUrl = el.backendUrl.value.trim().replace(/\/$/, '');
     const code = el.sessionCodeInput.value.trim().toUpperCase();
     if(!code){toast('Missing code','Enter the host session code.'); return;}
     const data = await api(`/api/sessions/by-code/${encodeURIComponent(code)}`);
@@ -305,7 +306,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     try{
       const ws = new WebSocket(url); state.ws = ws;
       ws.onopen = () => toast('Connected','Live updates are on.');
-      ws.onmessage = async (event) => { let msg={}; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset'].includes(msg.type)){ await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ toast('Table reset','Host reset the table.'); }} };
+      ws.onmessage = async (event) => { let msg={}; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset','team_message','broadcast_message','help_resolved'].includes(msg.type)){ if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ alert('The host reset your table. You will be returned to the sign-in screen.'); resetLocal(); return; } await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='team_message' && currentTable()?.tableId===msg.tableId){ playNotificationSound(); if(msg.message?.message) toast('Host message', msg.message.message); } if(msg.type==='broadcast_message'){ playNotificationSound(); if(msg.message?.message) toast('Host broadcast', msg.message.message); }} };
     }catch{}
   }
   async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
@@ -328,7 +329,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.phaseBadge.textContent = currentPhase();
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
     el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
-    el.connectionMeta.textContent = `Backend: ${state.backendUrl} · Session: ${state.session?.code || '—'} · Table: ${currentTable()?.label || '—'} · Player ID: ${state.playerId || '—'}`;
+    const latestHostMessage = (state.privateView?.hostMessages || []).slice(-1)[0];
+    if (el.hostMessageCard && el.hostMessageBody) {
+      if (latestHostMessage?.message) {
+        el.hostMessageCard.style.display = 'block';
+        el.hostMessageBody.textContent = latestHostMessage.message;
+      } else {
+        el.hostMessageCard.style.display = 'none';
+        el.hostMessageBody.textContent = '';
+      }
+    }
+
     const apps=Object.keys(APP_META);
     el.homeGrid.innerHTML = apps.map(appId => {
       const locked = appId==='accuse' && !currentPhase().startsWith('accusation');
@@ -373,6 +384,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(submitBtn){ submitBtn.onclick = async () => { try{ await submitAccusation(); } catch(err){ toast('Submit failed', err.message); } }; }
   }
   function canSubmitAccuse(){ return ['killer','motive','method','evidence'].every(k => !!state.accusationDraft[k]); }
+  async function sendHelpRequest(){
+    if(!state.session?.sessionId || !state.tableId) return;
+    const reason = prompt('What do you need help with?', 'Need host assistance');
+    if(reason === null) return;
+    await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/help`, {
+      method:'POST',
+      body:JSON.stringify({ reason: String(reason || 'Need host assistance').trim() || 'Need host assistance' })
+    });
+    toast('Help request sent');
+  }
+
   async function submitAccusation(){
     const res = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}/accuse`, {method:'POST', body:JSON.stringify(state.accusationDraft)});
     toast('Accusation submitted', res.result?.tier || 'submitted');
@@ -423,12 +445,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
   function bind(){
     load();
-    el.backendUrl.value=state.backendUrl || 'http://localhost:3000';
     el.playerNameInput.value=state.playerName || '';
     el.instagramInput.value=state.instagramTag || '';
     if(el.soundToggle){ el.soundToggle.checked = state.soundEnabled; el.soundToggle.onchange = () => { state.soundEnabled = el.soundToggle.checked; save(); }; }
     if(el.resetSessionBtn){ el.resetSessionBtn.onclick = () => resetLocal(); }
-    if(el.leaveSessionBtn){ el.leaveSessionBtn.onclick = () => resetLocal(); }
+    if(el.leaveSessionBtn){ el.leaveSessionBtn.onclick = () => { if(confirm('Leaving will end your current game. Are you sure?')) resetLocal(); }; }
+    if(el.helpBtn){ el.helpBtn.onclick = async () => { try { await sendHelpRequest(); } catch(err) { toast('Help request failed', err.message); } }; }
+    if(el.testSoundBtn){ el.testSoundBtn.onclick = () => playNotificationSound(); }
     el.findSessionBtn.onclick=async()=>{ try{ state.backendUrl=el.backendUrl.value.trim().replace(/\/$/,''); await findSession(); } catch(err){ toast('Find session failed', err.message); } };
     el.tableSelect.onchange=()=>{ state.tableId=el.tableSelect.value; renderJoin(); save(); };
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
