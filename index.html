@@ -187,7 +187,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     privateView:null, currentScreen:'connect', currentApp:'', viewed:{}, ws:null,
     accusationDraft:{killer:null,motive:null,method:null,evidence:null},
     soundEnabled:true,
-    lastUnlockCount:0
+    lastUnlockCount:0,
+    timerBaseElapsedSec: 0,
+    timerBaseCapturedAt: 0
   };
   const el = {
     notificationStack:document.getElementById('notificationStack'),
@@ -292,9 +294,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   async function joinTable(){
     const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId})});
-    state.playerId = data.player.playerId; state.privateView = data; switchScreen('home'); toast('Joined table', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
+    state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = Date.now(); switchScreen('home'); toast('Joined table', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
   }
-  async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; renderCurrent();}
+  async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = Date.now(); renderCurrent();}
   function wsUrlFromHttp(httpUrl){const u=new URL(httpUrl); u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'; u.pathname=''; u.search=''; u.hash=''; return u.toString().replace(/\/$/,'');}
   function connectWs(){
     if(!state.session?.sessionId) return;
@@ -308,7 +310,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
   function currentPhase(){ return state.privateView?.phase || currentTable()?.phase || 'lobby'; }
-  function elapsedSec(){ return state.privateView?.elapsedSec || currentTable()?.timers?.elapsedSec || 0; }
+  function elapsedSec(){
+    if(state.timerBaseCapturedAt){
+      const drift = Math.max(0, Math.floor((Date.now() - state.timerBaseCapturedAt) / 1000));
+      return Math.max(0, state.timerBaseElapsedSec + drift);
+    }
+    return state.privateView?.elapsedSec || currentTable()?.timers?.elapsedSec || 0;
+  }
   function formatClock(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
   function timeRemainingSec(){ return Math.max(0, 2700 - elapsedSec()); }
   function renderHome(){
