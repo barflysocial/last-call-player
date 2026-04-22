@@ -103,7 +103,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">If this device gets stuck in an old session, use Reset Session.</div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button">Find Session</button><button class="secondary" id="resetSessionBtn" type="button">Reset Session</button></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="window.__lastCallFindSession && window.__lastCallFindSession()">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="window.__lastCallResetSession && window.__lastCallResetSession()">Reset Session</button></div>
       <div class="mini" style="margin-top:12px"><label><input type="checkbox" id="soundToggle" checked style="width:auto;margin-right:6px"> Notification sound on</label></div>
     </section>
 
@@ -214,7 +214,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     hostMessageCard:document.getElementById('hostMessageCard'),
     hostMessageBody:document.getElementById('hostMessageBody'),
     homeGrid:document.getElementById('homeGrid'),
-    connectionMeta:document.getElementById('connectionMeta'),
     helpBtn:document.getElementById('helpBtn'),
     testSoundBtn:document.getElementById('testSoundBtn'),
     leaveSessionBtn:document.getElementById('leaveSessionBtn'),
@@ -438,17 +437,10 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
   function bindConnectButtons(){
     if(el.findSessionBtn){
-      el.findSessionBtn.onclick = async () => {
-        try{
-          state.backendUrl=(state.backendUrl || '').trim().replace(/\/$/,'');
-          await findSession();
-        }catch(err){
-          toast('Find session failed', err.message);
-        }
-      };
+      el.findSessionBtn.onclick = () => window.__lastCallFindSession && window.__lastCallFindSession();
     }
     if(el.resetSessionBtn){
-      el.resetSessionBtn.onclick = () => resetLocal();
+      el.resetSessionBtn.onclick = () => window.__lastCallResetSession && window.__lastCallResetSession();
     }
   }
 
