@@ -103,7 +103,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">If this device gets stuck in an old session, use Reset Session.</div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn">Find Session</button><button class="secondary" id="resetSessionBtn">Reset Session</button></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button">Find Session</button><button class="secondary" id="resetSessionBtn" type="button">Reset Session</button></div>
       <div class="mini" style="margin-top:12px"><label><input type="checkbox" id="soundToggle" checked style="width:auto;margin-right:6px"> Notification sound on</label></div>
     </section>
 
@@ -436,18 +436,31 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
   function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home') renderHome(); if(state.currentScreen==='app') renderApp(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
+  function bindConnectButtons(){
+    if(el.findSessionBtn){
+      el.findSessionBtn.onclick = async () => {
+        try{
+          state.backendUrl=(state.backendUrl || '').trim().replace(/\/$/,'');
+          await findSession();
+        }catch(err){
+          toast('Find session failed', err.message);
+        }
+      };
+    }
+    if(el.resetSessionBtn){
+      el.resetSessionBtn.onclick = () => resetLocal();
+    }
+  }
+
   function bind(){
     load();
     el.playerNameInput.value=state.playerName || '';
     el.instagramInput.value=state.instagramTag || '';
     if(el.soundToggle){ el.soundToggle.checked = state.soundEnabled; el.soundToggle.onchange = () => { state.soundEnabled = el.soundToggle.checked; save(); }; }
-    if(el.resetSessionBtn){ el.resetSessionBtn.onclick = () => resetLocal(); }
     if(el.leaveSessionBtn){ el.leaveSessionBtn.onclick = () => { if(confirm('Leaving will end your current game. Are you sure?')) resetLocal(); }; }
     if(el.helpBtn){ el.helpBtn.onclick = async () => { try { await sendHelpRequest(); } catch(err) { toast('Help request failed', err.message); } }; }
     if(el.testSoundBtn){ el.testSoundBtn.onclick = () => playNotificationSound(); }
-    if(el.resetSessionBtn){ el.resetSessionBtn.onclick = () => resetLocal(); }
-    if(el.leaveSessionBtn){ el.leaveSessionBtn.onclick = () => resetLocal(); }
-    el.findSessionBtn.onclick=async()=>{ try{ state.backendUrl=(state.backendUrl || '').trim().replace(/\/$/,''); await findSession(); } catch(err){ toast('Find session failed', err.message); } };
+    bindConnectButtons();
     el.tableSelect.onchange=()=>{ state.tableId=el.tableSelect.value; renderJoin(); save(); };
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
