@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">This device now starts fresh each time. Reset Session clears anything currently on this device. Best test: enter a session code, click Find Session, then use Reset Session to return to the connect screen. Build: 2.4.9.</div>
+        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">This device now starts fresh each time. Reset Session clears anything currently on this device. Best test: enter a session code, click Find Session, then use Reset Session to return to the connect screen. If the session only has one table, it will be auto-selected. Build: 2.4.9.</div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -287,14 +287,23 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     }).join('');
     el.roleList.querySelectorAll('[data-role]').forEach(btn => { btn.onclick = () => { state.selectedRoleId = btn.getAttribute('data-role'); renderRoleList(); updateJoinButton(); save(); }; });
   }
-  function updateJoinButton(){el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId)}
+  function updateJoinButton(){ if(!state.tableId && el.tableSelect?.value) state.tableId = el.tableSelect.value; el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId); }
   async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
     if(!code){toast('Missing code','Enter the host session code.'); return;}
     const data = await api(`/api/sessions/by-code/${encodeURIComponent(code)}`);
-    state.session = data;
-    if(!state.tableId && data.tables?.length) state.tableId = data.tables[0].tableId;
-    switchScreen('join'); connectWs(); toast('Session found', data.code);
+    const tables = Array.isArray(data?.tables) ? data.tables : Object.values(data?.tables || {});
+    state.session = { ...data, tables };
+    if(!tables.length){
+      toast('No tables found','This session has no tables available.');
+      switchScreen('connect');
+      return;
+    }
+    state.tableId = tables[0].tableId;
+    switchScreen('join');
+    renderJoin();
+    connectWs();
+    toast('Session found', data.code);
   }
   async function joinTable(){
     const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId})});
