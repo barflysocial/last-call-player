@@ -116,7 +116,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
             <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
       <div class="field"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
-      <button id="joinTableBtn" disabled>Claim Role & Join</button>
+      <button id="joinTableBtn" type="button" disabled>Claim Role & Join</button>
     </section>
 
     <section class="screen" id="screen-home">
@@ -263,11 +263,34 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
   async function api(path, opts={}){const url=`${state.backendUrl}${path}`; const res=await fetch(url,{headers:{'Content-Type':'application/json'},...opts}); if(!res.ok){const text=await res.text(); throw new Error(text || `Request failed: ${res.status}`)} return res.json();}
   function switchScreen(name){state.currentScreen=name; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(`screen-${name}`).classList.add('active'); if(name==='join')renderJoin(); if(name==='home')renderHome(); if(name==='app')renderApp(); save();}
-  function currentTable(){return (state.session?.tables || []).find(t => t.tableId === state.tableId) || null}
+  function normalizePlayers(players){
+    if(Array.isArray(players)) return players;
+    return Object.values(players || {});
+  }
+
+  function normalizeTable(t){
+    const players = normalizePlayers(t?.players);
+    const roleClaims = Array.isArray(t?.roleClaims) ? t.roleClaims : Array.isArray(t?.claims) ? t.claims : [];
+    return {
+      ...t,
+      tableId: t?.tableId || t?.id || '',
+      players,
+      roleClaims,
+      label: t?.label || t?.name || 'Team',
+      phase: t?.phase || t?.timers?.phase || 'lobby'
+    };
+  }
+
+  function normalizeTables(tables){
+    if(Array.isArray(tables)) return tables.map(normalizeTable);
+    return Object.values(tables || {}).map(normalizeTable);
+  }
+
+  function currentTable(){return normalizeTables(state.session?.tables || []).find(t => t.tableId === state.tableId) || null}
   function answerChoices(){return state.privateView?.answerChoices || DEFAULT_ANSWERS}
   function renderJoin(){
     if(!state.session) return;
-    const tables = Array.isArray(state.session.tables) ? state.session.tables : Object.values(state.session.tables || {});
+    const tables = normalizeTables(state.session.tables);
     state.session.tables = tables;
     if(!state.tableId && tables.length) state.tableId = tables[0].tableId;
     const table = currentTable() || tables[0] || null;
@@ -282,22 +305,23 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   function renderRoleList(){
     const table = currentTable();
+    const players = normalizePlayers(table?.players);
     const fallbackClaims = Object.keys(ROLE_LABELS).map(roleId => {
-      const claimedPlayer = (table?.players || []).find(p => p.roleId === roleId);
+      const claimedPlayer = players.find(p => p.roleId === roleId);
       return {
         roleId,
         roleLabel: ROLE_LABELS[roleId],
         claimed: Boolean(claimedPlayer),
         playerName: claimedPlayer?.playerName || null,
-        playerId: claimedPlayer?.playerId || null,
+        playerId: claimedPlayer?.playerId || claimedPlayer?.id || null,
       };
     });
     const claims = Array.isArray(table?.roleClaims) && table.roleClaims.length ? table.roleClaims : fallbackClaims;
 
     el.roleList.innerHTML = claims.map(role => {
-      const disabled = role.claimed;
+      const disabled = !!role.claimed;
       const selected = state.selectedRoleId === role.roleId;
-      return `<div class="role-card"><h3>${escapeHtml(role.roleLabel)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
+      return `<div class="role-card"><h3>${escapeHtml(role.roleLabel || ROLE_LABELS[role.roleId] || role.roleId)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button type="button" class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
     }).join('');
 
     el.roleList.querySelectorAll('[data-role]').forEach(btn => {
@@ -309,12 +333,12 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       };
     });
   }
-  function updateJoinButton(){ el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId); }
+  function updateJoinButton(){ const ok = !!(state.playerName && state.selectedRoleId && state.tableId); el.joinTableBtn.disabled = !ok; }
   async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
     if(!code){toast('Missing code','Enter the host session code.'); return;}
     const data = await api(`/api/sessions/by-code/${encodeURIComponent(code)}`);
-    const tables = Array.isArray(data?.tables) ? data.tables : Object.values(data?.tables || {});
+    const tables = normalizeTables(data?.tables);
     state.session = { ...data, tables };
     if(!tables.length){
       toast('No teams found','This session does not have any teams available yet.');
@@ -322,6 +346,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       return;
     }
     state.tableId = tables[0].tableId;
+    state.selectedRoleId = '';
     switchScreen('join');
     renderJoin();
     connectWs();
@@ -547,7 +572,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     bindConnectButtons();
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
-    el.joinTableBtn.onclick=async()=>{ try{ await joinTable(); } catch(err){ toast('Join failed', err.message); } };
+    el.joinTableBtn.onclick=async()=>{ if(!state.playerName) return toast('Missing name','Enter your name first.'); if(!state.selectedRoleId) return toast('Missing role','Choose an open role first.'); if(!state.tableId) return toast('Missing team','No team is selected for this session.'); try{ await joinTable(); } catch(err){ toast('Join failed', err.message); } };
     el.backHomeBtn.onclick=()=>switchScreen('home');
     el.openAccuseBtn.onclick=()=>{ state.currentApp='accuse'; switchScreen('app'); };
     if(state.session?.sessionId){ connectWs(); if(state.playerId && state.tableId){ refreshSessionAndPlayer().catch(()=>{}); switchScreen('home'); } else { switchScreen('join'); } } else { switchScreen('connect'); }
