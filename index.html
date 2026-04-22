@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">This device now starts fresh each time. Reset Session clears anything currently on this device. Best test: enter a session code, click Find Session, then use Reset Session to return to the connect screen. If the session only has one table, it will be auto-selected. Build: 2.4.9.</div>
+        <div class="body">Enter the session code from the host, then choose your role. If there is only one team, it will be selected automatically.</div><div class="mini" style="margin-top:10px"></div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -113,7 +113,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
-      <div class="field"><div class="label">Table</div><select id="tableSelect"></select></div>
+      <div class="field" id="tableField"><div class="label">Team</div><select id="tableSelect"></select></div>
       <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
       <div class="field"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
@@ -199,6 +199,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     resetSessionBtn:document.getElementById('resetSessionBtn'),
     joinSessionTitle:document.getElementById('joinSessionTitle'),
     joinSessionMeta:document.getElementById('joinSessionMeta'),
+    tableField:document.getElementById('tableField'),
     tableSelect:document.getElementById('tableSelect'),
     playerNameInput:document.getElementById('playerNameInput'),
     instagramInput:document.getElementById('instagramInput'),
@@ -295,7 +296,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     const tables = Array.isArray(data?.tables) ? data.tables : Object.values(data?.tables || {});
     state.session = { ...data, tables };
     if(!tables.length){
-      toast('No tables found','This session has no tables available.');
+      toast('No teams found','This session does not have any teams available yet.');
       switchScreen('connect');
       return;
     }
