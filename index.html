@@ -307,7 +307,30 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     try{
       const ws = new WebSocket(url); state.ws = ws;
       ws.onopen = () => toast('Connected','Live updates are on.');
-      ws.onmessage = async (event) => { let msg={}; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset','team_message','broadcast_message','help_resolved'].includes(msg.type)){ if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ alert('The host reset your table. You will be returned to the sign-in screen.'); resetLocal(); return; } await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='team_message' && currentTable()?.tableId===msg.tableId){ playNotificationSound(); if(msg.message?.message) toast('Host message', msg.message.message); } if(msg.type==='broadcast_message'){ playNotificationSound(); if(msg.message?.message) toast('Host broadcast', msg.message.message); }} }; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset'].includes(msg.type)){ await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ toast('Table reset','Host reset the table.'); }} };
+      ws.onmessage = async (event) => {
+        let msg={};
+        try{ msg=JSON.parse(event.data); }catch{}
+        if(msg.type==='connected') return;
+        if(['table_updated','table_started','player_submitted','table_revealed','table_reset','team_message','broadcast_message','help_resolved'].includes(msg.type)){
+          if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){
+            alert('The host reset your table. You will be returned to the sign-in screen.');
+            resetLocal();
+            return;
+          }
+          await refreshSessionAndPlayer();
+          if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){
+            showReveal(msg.reveal);
+          }
+          if(msg.type==='team_message' && currentTable()?.tableId===msg.tableId){
+            playNotificationSound();
+            if(msg.message?.message) toast('Host message', msg.message.message);
+          }
+          if(msg.type==='broadcast_message'){
+            playNotificationSound();
+            if(msg.message?.message) toast('Host broadcast', msg.message.message);
+          }
+        }
+      };
     }catch{}
   }
   async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
