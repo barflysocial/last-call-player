@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">If this device gets stuck in an old session, use Reset Session.</div>
+        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">This device now starts fresh each time. Reset Session clears anything currently on this device.</div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="window.__lastCallFindSession && window.__lastCallFindSession()">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="window.__lastCallResetSession && window.__lastCallResetSession()">Reset Session</button></div>
@@ -227,24 +227,26 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     soundToggle:document.getElementById('soundToggle'),
   };
 
-  function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify({backendUrl:state.backendUrl,session:state.session,tableId:state.tableId,selectedRoleId:state.selectedRoleId,playerName:state.playerName,instagramTag:state.instagramTag,playerId:state.playerId,viewed:state.viewed,accusationDraft:state.accusationDraft,soundEnabled:state.soundEnabled}))}
-  function load(){const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return; try{Object.assign(state, JSON.parse(raw));}catch{}}
-  function resetLocal(){ try{ if(state.ws){ state.ws.close(); state.ws=null; } }catch{} localStorage.removeItem(STORAGE_KEY); location.reload(); }
-  function escapeHtml(str){return String(str ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function toast(title, body=''){const div=document.createElement('div'); div.className='banner'; div.innerHTML=`<div class="banner-title">${escapeHtml(title)}</div><div class="banner-body">${escapeHtml(body)}</div>`; el.notificationStack.appendChild(div); setTimeout(()=>{div.style.opacity='0';div.style.transform='translateY(-6px)'},2600); setTimeout(()=>div.remove(),3000);}
-  function playNotificationSound(){
-    if(!state.soundEnabled) return;
+  function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify({soundEnabled:state.soundEnabled,instagramTag:state.instagramTag}))}
+  function load(){
     try{
-      const ctx=new (window.AudioContext || window.webkitAudioContext)();
-      const o=ctx.createOscillator();
-      const g=ctx.createGain();
-      o.type='sine';
-      o.frequency.setValueAtTime(900, ctx.currentTime);
-      o.frequency.exponentialRampToValueAtTime(680, ctx.currentTime + 0.08);
-      g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
-      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.17);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      const saved = JSON.parse(raw);
+      state.soundEnabled = saved?.soundEnabled ?? state.soundEnabled;
+      state.instagramTag = saved?.instagramTag || '';
+      state.session = null;
+      state.tableId = '';
+      state.selectedRoleId = '';
+      state.playerName = '';
+      state.playerId = '';
+      state.privateView = null;
+      state.currentScreen = 'connect';
+      state.currentApp = '';
+      state.viewed = {};
+      state.accusationDraft = {killer:null,motive:null,method:null,evidence:null};
+      state.timerBaseElapsedSec = 0;
+      state.timerBaseCapturedAt = 0;
     }catch{}
   }
 
