@@ -136,11 +136,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         </div>
       </div>
       <div class="home-grid" id="homeGrid"></div>
-      <div class="card">
-        <div class="tiny">Connection</div>
-        <div class="body" id="connectionMeta">Not connected.</div>
-        <div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="leaveSessionBtn">Leave Session</button></div>
-      </div>
     </section>
 
     <section class="screen" id="screen-app">
@@ -264,7 +259,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(!state.session) return;
     el.joinSessionTitle.textContent = state.session.title || 'Last Call';
     const table = currentTable();
-    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Table:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Role:</strong> ${escapeHtml(ROLE_LABELS[state.selectedRoleId] || 'Not selected')}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
+    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Role:</strong> ${escapeHtml(ROLE_LABELS[state.selectedRoleId] || 'Not selected')}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
     if(!state.tableId && state.session.tables?.length) state.tableId = state.session.tables[0].tableId;
     el.tableSelect.innerHTML = (state.session.tables || []).map(t => `<option value="${t.tableId}" ${state.tableId===t.tableId?'selected':''}>${escapeHtml(t.label)} — ${escapeHtml(t.truthPackId || 'version_a')} — ${escapeHtml(t.phase)}</option>`).join('');
     el.playerNameInput.value = state.playerName || '';
@@ -308,6 +303,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
   function currentPhase(){ return state.privateView?.phase || currentTable()?.phase || 'lobby'; }
   function elapsedSec(){
+    const startedAt = state.privateView?.startedAt || currentTable()?.startedAt || null;
+    if(!startedAt) return 0;
     if(state.timerBaseCapturedAt){
       const drift = Math.max(0, Math.floor((Date.now() - state.timerBaseCapturedAt) / 1000));
       return Math.max(0, state.timerBaseElapsedSec + drift);
