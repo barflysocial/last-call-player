@@ -288,7 +288,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.roleList.querySelectorAll('[data-role]').forEach(btn => { btn.onclick = () => { state.selectedRoleId = btn.getAttribute('data-role'); renderRoleList(); updateJoinButton(); save(); }; });
   }
   function updateJoinButton(){el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId)}
-  async async function findSession(){
+  async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
     if(!code){toast('Missing code','Enter the host session code.'); return;}
     const data = await api(`/api/sessions/by-code/${encodeURIComponent(code)}`);
