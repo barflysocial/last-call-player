@@ -135,6 +135,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
           <div class="timer-pill" id="rolePrompt">Waiting for host start.</div>
         </div>
       </div>
+      <div class="card" id="clueLaneCard" style="display:none"><div class="tiny">Adaptive Clue Lane</div><div class="body" id="clueLaneBody"></div></div>
       <div class="home-grid" id="homeGrid"></div>
     </section>
 
@@ -206,6 +207,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     phaseBadge:document.getElementById('phaseBadge'),
     timeRemaining:document.getElementById('timeRemaining'),
     rolePrompt:document.getElementById('rolePrompt'),
+    clueLaneCard:document.getElementById('clueLaneCard'),
+    clueLaneBody:document.getElementById('clueLaneBody'),
     homeGrid:document.getElementById('homeGrid'),
     connectionMeta:document.getElementById('connectionMeta'),
     leaveSessionBtn:document.getElementById('leaveSessionBtn'),
