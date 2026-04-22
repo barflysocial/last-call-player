@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then choose your role. If there is only one team, it will be selected automatically. Roles will still appear even if the backend sends an older table format.</div><div class="mini" style="margin-top:10px"></div>
+        <div class="body">Enter the session code from the host, then enter your name and choose your role.</div><div class="mini" style="margin-top:10px"></div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -113,8 +113,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
-      <div class="field" id="tableField"><div class="label">Team</div><select id="tableSelect"></select></div>
-      <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
+            <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
       <div class="field"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
       <button id="joinTableBtn" disabled>Claim Role & Join</button>
@@ -199,8 +198,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     resetSessionBtn:document.getElementById('resetSessionBtn'),
     joinSessionTitle:document.getElementById('joinSessionTitle'),
     joinSessionMeta:document.getElementById('joinSessionMeta'),
-    tableField:document.getElementById('tableField'),
-    tableSelect:document.getElementById('tableSelect'),
     playerNameInput:document.getElementById('playerNameInput'),
     instagramInput:document.getElementById('instagramInput'),
     roleList:document.getElementById('roleList'),
@@ -270,11 +267,14 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function answerChoices(){return state.privateView?.answerChoices || DEFAULT_ANSWERS}
   function renderJoin(){
     if(!state.session) return;
+    const tables = Array.isArray(state.session.tables) ? state.session.tables : Object.values(state.session.tables || {});
+    state.session.tables = tables;
+    if(!state.tableId && tables.length) state.tableId = tables[0].tableId;
+    const table = currentTable() || tables[0] || null;
+    if(table?.tableId) state.tableId = table.tableId;
+
     el.joinSessionTitle.textContent = state.session.title || 'Last Call';
-    const table = currentTable();
     el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Role:</strong> ${escapeHtml(ROLE_LABELS[state.selectedRoleId] || 'Not selected')}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
-    if(!state.tableId && state.session.tables?.length) state.tableId = state.session.tables[0].tableId;
-    el.tableSelect.innerHTML = (state.session.tables || []).map(t => `<option value="${t.tableId}" ${state.tableId===t.tableId?'selected':''}>${escapeHtml(t.label)} — ${escapeHtml(t.truthPackId || 'version_a')} — ${escapeHtml(t.phase)}</option>`).join('');
     el.playerNameInput.value = state.playerName || '';
     el.instagramInput.value = state.instagramTag || '';
     renderRoleList();
@@ -309,7 +309,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       };
     });
   }
-  function updateJoinButton(){ if(!state.tableId && el.tableSelect?.value) state.tableId = el.tableSelect.value; el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId); }
+  function updateJoinButton(){ el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId); }
   async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
     if(!code){toast('Missing code','Enter the host session code.'); return;}
@@ -545,7 +545,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(el.helpBtn){ el.helpBtn.onclick = async () => { try { await sendHelpRequest(); } catch(err) { toast('Help request failed', err.message); } }; }
     if(el.testSoundBtn){ el.testSoundBtn.onclick = () => playNotificationSound(); }
     bindConnectButtons();
-    el.tableSelect.onchange=()=>{ state.tableId=el.tableSelect.value; renderJoin(); save(); };
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
     el.joinTableBtn.onclick=async()=>{ try{ await joinTable(); } catch(err){ toast('Join failed', err.message); } };
