@@ -132,11 +132,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         </div>
         <div class="timer">
           <div class="timer-pill" id="timeRemaining">Time Left — 45:00</div>
-          <div class="timer-pill" id="rolePrompt">Waiting for host start.</div>
+          <div class="timer-pill" id="rolePrompt">Waiting for host to start.</div>
         </div>
       </div>
       <div class="card" id="clueLaneCard" style="display:none"><div class="tiny">Adaptive Clue Lane</div><div class="body" id="clueLaneBody"></div></div>
+      <div class="card" id="hostMessageCard" style="display:none"><div class="tiny">Host Message</div><div class="body" id="hostMessageBody"></div></div>
       <div class="home-grid" id="homeGrid"></div>
+      <div class="card"><div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="helpBtn">Help</button><button class="secondary" id="testSoundBtn">Test Sound</button><button class="secondary" id="leaveSessionBtn">Leave Session</button></div></div>
     </section>
 
     <section class="screen" id="screen-app">
@@ -209,8 +211,12 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     rolePrompt:document.getElementById('rolePrompt'),
     clueLaneCard:document.getElementById('clueLaneCard'),
     clueLaneBody:document.getElementById('clueLaneBody'),
+    hostMessageCard:document.getElementById('hostMessageCard'),
+    hostMessageBody:document.getElementById('hostMessageBody'),
     homeGrid:document.getElementById('homeGrid'),
     connectionMeta:document.getElementById('connectionMeta'),
+    helpBtn:document.getElementById('helpBtn'),
+    testSoundBtn:document.getElementById('testSoundBtn'),
     leaveSessionBtn:document.getElementById('leaveSessionBtn'),
     backHomeBtn:document.getElementById('backHomeBtn'),
     openAccuseBtn:document.getElementById('openAccuseBtn'),
@@ -247,9 +253,11 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     const apps = privateView?.apps || {};
     let count = (privateView?.publicClues || []).length;
     Object.values(apps).forEach(arr => count += (arr || []).length);
+    count += (privateView?.hostMessages || []).length;
     if(state.lastUnlockCount && count > state.lastUnlockCount){
       playNotificationSound();
-      toast('New clue unlocked');
+      const latestHostMessage = (privateView?.hostMessages || []).slice(-1)[0];
+      toast(latestHostMessage?.message ? 'Host message' : 'New clue unlocked', latestHostMessage?.message || '');
     }
     state.lastUnlockCount = count;
   }
@@ -289,9 +297,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   async function joinTable(){
     const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId})});
-    state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = Date.now(); switchScreen('home'); toast('Joined table', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
+    state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); switchScreen('home'); toast('Joined table', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
   }
-  async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = Date.now(); renderCurrent();}
+  async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); renderCurrent();}
   function wsUrlFromHttp(httpUrl){const u=new URL(httpUrl); u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'; u.pathname=''; u.search=''; u.hash=''; return u.toString().replace(/\/$/,'');}
   function connectWs(){
     if(!state.session?.sessionId) return;
@@ -300,7 +308,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     try{
       const ws = new WebSocket(url); state.ws = ws;
       ws.onopen = () => toast('Connected','Live updates are on.');
-      ws.onmessage = async (event) => { let msg={}; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset'].includes(msg.type)){ await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ toast('Table reset','Host reset the table.'); }} };
+      ws.onmessage = async (event) => { let msg={}; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset','team_message','broadcast_message','help_resolved'].includes(msg.type)){ if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ alert('The host reset your table. You will be returned to the sign-in screen.'); resetLocal(); return; } await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='team_message' && currentTable()?.tableId===msg.tableId){ playNotificationSound(); if(msg.message?.message) toast('Host message', msg.message.message); } if(msg.type==='broadcast_message'){ playNotificationSound(); if(msg.message?.message) toast('Host broadcast', msg.message.message); }} }; try{msg=JSON.parse(event.data)}catch{} if(msg.type==='connected') return; if(['table_updated','table_started','player_submitted','table_revealed','table_reset'].includes(msg.type)){ await refreshSessionAndPlayer(); if(msg.type==='table_revealed' && currentTable()?.tableId===msg.tableId){ showReveal(msg.reveal); } if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){ toast('Table reset','Host reset the table.'); }} };
     }catch{}
   }
   async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
@@ -324,7 +332,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.heroRole.textContent = roleName ? `${roleLabel} — ${roleName}` : roleLabel;
     el.phaseBadge.textContent = currentPhase();
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
-    el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
+    el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
     const apps=Object.keys(APP_META);
     el.homeGrid.innerHTML = apps.map(appId => {
       const locked = appId==='accuse' && !currentPhase().startsWith('accusation');
@@ -369,6 +377,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(submitBtn){ submitBtn.onclick = async () => { try{ await submitAccusation(); } catch(err){ toast('Submit failed', err.message); } }; }
   }
   function canSubmitAccuse(){ return ['killer','motive','method','evidence'].every(k => !!state.accusationDraft[k]); }
+  async function sendHelpRequest(){
+    if(!state.session?.sessionId || !state.tableId) return;
+    const reason = prompt('What do you need help with?', 'Need host assistance');
+    if(reason === null) return;
+    await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/help`, {
+      method:'POST',
+      body:JSON.stringify({ reason: String(reason || 'Need host assistance').trim() || 'Need host assistance' })
+    });
+    toast('Help request sent');
+  }
+
   async function submitAccusation(){
     const res = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}/accuse`, {method:'POST', body:JSON.stringify(state.accusationDraft)});
     toast('Accusation submitted', res.result?.tier || 'submitted');
@@ -422,6 +441,10 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.playerNameInput.value=state.playerName || '';
     el.instagramInput.value=state.instagramTag || '';
     if(el.soundToggle){ el.soundToggle.checked = state.soundEnabled; el.soundToggle.onchange = () => { state.soundEnabled = el.soundToggle.checked; save(); }; }
+    if(el.resetSessionBtn){ el.resetSessionBtn.onclick = () => resetLocal(); }
+    if(el.leaveSessionBtn){ el.leaveSessionBtn.onclick = () => { if(confirm('Leaving will end your current game. Are you sure?')) resetLocal(); }; }
+    if(el.helpBtn){ el.helpBtn.onclick = async () => { try { await sendHelpRequest(); } catch(err) { toast('Help request failed', err.message); } }; }
+    if(el.testSoundBtn){ el.testSoundBtn.onclick = () => playNotificationSound(); }
     if(el.resetSessionBtn){ el.resetSessionBtn.onclick = () => resetLocal(); }
     if(el.leaveSessionBtn){ el.leaveSessionBtn.onclick = () => resetLocal(); }
     el.findSessionBtn.onclick=async()=>{ try{ state.backendUrl=(state.backendUrl || '').trim().replace(/\/$/,''); await findSession(); } catch(err){ toast('Find session failed', err.message); } };
