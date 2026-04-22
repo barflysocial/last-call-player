@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">This device now starts fresh each time. Reset Session clears anything currently on this device. Best test: enter a session code, click Find Session, then use Reset Session to return to the connect screen.</div>
+        <div class="body">Enter the session code from the host, then pick your team and role.</div><div class="mini" style="margin-top:10px">This device now starts fresh each time. Reset Session clears anything currently on this device. Best test: enter a session code, click Find Session, then use Reset Session to return to the connect screen. Build: 2.4.9.</div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -460,6 +460,24 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
   function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home') renderHome(); if(state.currentScreen==='app') renderApp(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
+  function resetLocal(){
+    try{ if(state.ws){ state.ws.close(); state.ws=null; } }catch{}
+    try{ localStorage.removeItem(STORAGE_KEY); }catch{}
+    state.session = null;
+    state.tableId = '';
+    state.selectedRoleId = '';
+    state.playerName = '';
+    state.playerId = '';
+    state.privateView = null;
+    state.currentScreen = 'connect';
+    state.currentApp = '';
+    state.viewed = {};
+    state.accusationDraft = {killer:null,motive:null,method:null,evidence:null};
+    state.timerBaseElapsedSec = 0;
+    state.timerBaseCapturedAt = 0;
+    location.reload();
+  }
+
   function bindConnectButtons(){
     window.__lastCallFindSession = async () => {
       try{
@@ -509,22 +527,4 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 })();
 </script>
 </body>
-</html>  function resetLocal(){
-    try{ if(state.ws){ state.ws.close(); state.ws=null; } }catch{}
-    try{ localStorage.removeItem(STORAGE_KEY); }catch{}
-    state.session = null;
-    state.tableId = '';
-    state.selectedRoleId = '';
-    state.playerName = '';
-    state.playerId = '';
-    state.privateView = null;
-    state.currentScreen = 'connect';
-    state.currentApp = '';
-    state.viewed = {};
-    state.accusationDraft = {killer:null,motive:null,method:null,evidence:null};
-    state.timerBaseElapsedSec = 0;
-    state.timerBaseCapturedAt = 0;
-    location.reload();
-  }
-
-
+</html>
