@@ -115,8 +115,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       </div>
             <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
-      <div class="field"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
-      <button id="joinTableBtn" type="button" disabled>Claim Role & Join</button>
+      <div class="field"><div class="label">Play Mode</div><div class="roles" id="playModeList"></div></div>
+      <div class="field" id="roleField"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
+      <button id="joinTableBtn" type="button" disabled>Join</button>
     </section>
 
     <section class="screen" id="screen-home">
@@ -136,6 +137,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       </div>
       <div class="card" id="clueLaneCard" style="display:none"><div class="tiny">Adaptive Clue Lane</div><div class="body" id="clueLaneBody"></div></div>
       <div class="card" id="hostMessageCard" style="display:none"><div class="tiny">Host Message</div><div class="body" id="hostMessageBody"></div></div>
+<div class="card" id="postJoinRoleCard" style="display:none"><div class="tiny">Choose Role</div><div class="body" style="margin-bottom:10px">Solo player mode lets you join first. Pick your role here.</div><div class="roles" id="postJoinRoleList"></div></div>
       <div class="home-grid" id="homeGrid"></div>
       <div class="card"><div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="helpBtn">Help</button><button class="secondary" id="testSoundBtn">Test Sound</button><button class="secondary" id="leaveSessionBtn">Leave Session</button></div></div>
     </section>
@@ -179,7 +181,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   };
   const state = {
     backendUrl:'https://last-call-backend-rnc8.onrender.com',
-    session:null, tableId:'', selectedRoleId:'', playerName:'', instagramTag:'', playerId:'',
+    session:null, tableId:'', selectedRoleId:'', playMode:'solo', playerName:'', instagramTag:'', playerId:'',
     privateView:null, currentScreen:'connect', currentApp:'', viewed:{}, ws:null,
     accusationDraft:{killer:null,motive:null,method:null,evidence:null},
     soundEnabled:true,
@@ -200,6 +202,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     joinSessionMeta:document.getElementById('joinSessionMeta'),
     playerNameInput:document.getElementById('playerNameInput'),
     instagramInput:document.getElementById('instagramInput'),
+    playModeList:document.getElementById('playModeList'),
+    roleField:document.getElementById('roleField'),
     roleList:document.getElementById('roleList'),
     joinTableBtn:document.getElementById('joinTableBtn'),
     heroPlayer:document.getElementById('heroPlayer'),
@@ -211,6 +215,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     clueLaneBody:document.getElementById('clueLaneBody'),
     hostMessageCard:document.getElementById('hostMessageCard'),
     hostMessageBody:document.getElementById('hostMessageBody'),
+    postJoinRoleCard:document.getElementById('postJoinRoleCard'),
+    postJoinRoleList:document.getElementById('postJoinRoleList'),
     homeGrid:document.getElementById('homeGrid'),
     helpBtn:document.getElementById('helpBtn'),
     testSoundBtn:document.getElementById('testSoundBtn'),
@@ -236,6 +242,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       state.session = null;
       state.tableId = '';
       state.selectedRoleId = '';
+    state.playMode = 'solo';
+      state.playMode = 'solo';
       state.playerName = '';
       state.playerId = '';
       state.privateView = null;
@@ -288,6 +296,37 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
   function currentTable(){return normalizeTables(state.session?.tables || []).find(t => t.tableId === state.tableId) || null}
   function answerChoices(){return state.privateView?.answerChoices || DEFAULT_ANSWERS}
+  function isSoloTable(){
+    const t = currentTable();
+    return (t?.mode || 'team') === 'solo';
+  }
+
+  function renderPlayModeList(){
+    if(!el.playModeList) return;
+    const modes = isSoloTable()
+      ? [{id:'solo', label:'Solo Player', desc:'Join first. Choose your role after joining.'},
+         {id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}]
+      : [{id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}];
+
+    if(!modes.find(m => m.id === state.playMode)) state.playMode = modes[0]?.id || 'multi';
+
+    el.playModeList.innerHTML = modes.map(mode => {
+      const selected = state.playMode === mode.id;
+      return `<div class="role-card"><h3>${escapeHtml(mode.label)}</h3><div class="meta">${escapeHtml(mode.desc)}</div><button type="button" class="${selected ? '' : 'secondary'}" data-play-mode="${mode.id}">${selected ? 'Selected' : 'Choose'}</button></div>`;
+    }).join('');
+
+    el.playModeList.querySelectorAll('[data-play-mode]').forEach(btn => {
+      btn.onclick = () => {
+        state.playMode = btn.getAttribute('data-play-mode');
+        if(state.playMode === 'solo') state.selectedRoleId = '';
+        renderPlayModeList();
+        renderRoleList();
+        updateJoinButton();
+        save();
+      };
+    });
+  }
+
   function renderJoin(){
     if(!state.session) return;
     const tables = normalizeTables(state.session.tables);
@@ -297,9 +336,10 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(table?.tableId) state.tableId = table.tableId;
 
     el.joinSessionTitle.textContent = state.session.title || 'Last Call';
-    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Role:</strong> ${escapeHtml(ROLE_LABELS[state.selectedRoleId] || 'Not selected')}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
+    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Play Mode:</strong> ${escapeHtml(state.playMode === "solo" ? "Solo Player" : "Multiplayer")}</div><div><strong>Role:</strong> ${escapeHtml((state.playMode === "solo" && isSoloTable()) ? "Choose after joining" : (ROLE_LABELS[state.selectedRoleId] || "Not selected"))}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
     el.playerNameInput.value = state.playerName || '';
     el.instagramInput.value = state.instagramTag || '';
+    renderPlayModeList();
     renderRoleList();
     updateJoinButton();
   }
@@ -318,6 +358,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     });
     const claims = Array.isArray(table?.roleClaims) && table.roleClaims.length ? table.roleClaims : fallbackClaims;
 
+    if (el.roleField) el.roleField.style.display = (state.playMode === 'solo' && isSoloTable()) ? 'none' : '';
+
+    if(state.playMode === 'solo' && isSoloTable()){
+      el.roleList.innerHTML = '<div class="mini">Solo player mode skips role selection during sign-in. You can choose your role after joining.</div>';
+      return;
+    }
+
     el.roleList.innerHTML = claims.map(role => {
       const disabled = !!role.claimed;
       const selected = state.selectedRoleId === role.roleId;
@@ -333,7 +380,14 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       };
     });
   }
-  function updateJoinButton(){ const ok = !!(state.playerName && state.selectedRoleId && state.tableId); el.joinTableBtn.disabled = !ok; }
+  function updateJoinButton(){
+    const needsRole = !(state.playMode === 'solo' && isSoloTable());
+    const ok = !!(state.playerName && state.tableId && (!needsRole || state.selectedRoleId));
+    el.joinTableBtn.disabled = !ok;
+    if(el.joinTableBtn){
+      el.joinTableBtn.textContent = (state.playMode === 'solo' && isSoloTable()) ? 'Join Solo Game' : 'Claim Role & Join';
+    }
+  }
   async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
     if(!code){toast('Missing code','Enter the host session code.'); return;}
@@ -353,7 +407,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     toast('Session found', data.code);
   }
   async function joinTable(){
-    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId})});
+    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId || null, playMode:state.playMode})});
     state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); switchScreen('home'); toast('Joined table', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
   }
   async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); renderCurrent();}
@@ -457,6 +511,18 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(submitBtn){ submitBtn.onclick = async () => { try{ await submitAccusation(); } catch(err){ toast('Submit failed', err.message); } }; }
   }
   function canSubmitAccuse(){ return ['killer','motive','method','evidence'].every(k => !!state.accusationDraft[k]); }
+  async function chooseRoleAfterJoin(roleId){
+    if(!state.session?.sessionId || !state.tableId || !state.playerId) return;
+    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}/role`, {
+      method:'POST',
+      body:JSON.stringify({ roleId })
+    });
+    state.privateView = data;
+    state.selectedRoleId = data?.player?.roleId || roleId;
+    renderCurrent();
+    toast('Role selected', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
+  }
+
   async function sendHelpRequest(){
     if(!state.session?.sessionId || !state.tableId) return;
     const reason = prompt('What do you need help with?', 'Need host assistance');
@@ -572,7 +638,12 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     bindConnectButtons();
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
-    el.joinTableBtn.onclick=async()=>{ if(!state.playerName) return toast('Missing name','Enter your name first.'); if(!state.selectedRoleId) return toast('Missing role','Choose an open role first.'); if(!state.tableId) return toast('Missing team','No team is selected for this session.'); try{ await joinTable(); } catch(err){ toast('Join failed', err.message); } };
+    el.joinTableBtn.onclick=async()=>{
+      if(!state.playerName) return toast('Missing name','Enter your name first.');
+      if(!state.tableId) return toast('Missing team','No team is selected for this session.');
+      if(!(state.playMode === 'solo' && isSoloTable()) && !state.selectedRoleId) return toast('Missing role','Choose an open role first.');
+      try{ await joinTable(); } catch(err){ toast('Join failed', err.message); }
+    };
     el.backHomeBtn.onclick=()=>switchScreen('home');
     el.openAccuseBtn.onclick=()=>{ state.currentApp='accuse'; switchScreen('app'); };
     if(state.session?.sessionId){ connectWs(); if(state.playerId && state.tableId){ refreshSessionAndPlayer().catch(()=>{}); switchScreen('home'); } else { switchScreen('join'); } } else { switchScreen('connect'); }
