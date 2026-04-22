@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then choose your role. If there is only one team, it will be selected automatically.</div><div class="mini" style="margin-top:10px"></div>
+        <div class="body">Enter the session code from the host, then choose your role. If there is only one team, it will be selected automatically. Roles will still appear even if the backend sends an older table format.</div><div class="mini" style="margin-top:10px"></div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -281,12 +281,33 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     updateJoinButton();
   }
   function renderRoleList(){
-    const table=currentTable(); const claims=table?.roleClaims || [];
+    const table = currentTable();
+    const fallbackClaims = Object.keys(ROLE_LABELS).map(roleId => {
+      const claimedPlayer = (table?.players || []).find(p => p.roleId === roleId);
+      return {
+        roleId,
+        roleLabel: ROLE_LABELS[roleId],
+        claimed: Boolean(claimedPlayer),
+        playerName: claimedPlayer?.playerName || null,
+        playerId: claimedPlayer?.playerId || null,
+      };
+    });
+    const claims = Array.isArray(table?.roleClaims) && table.roleClaims.length ? table.roleClaims : fallbackClaims;
+
     el.roleList.innerHTML = claims.map(role => {
-      const disabled = role.claimed; const selected = state.selectedRoleId === role.roleId;
+      const disabled = role.claimed;
+      const selected = state.selectedRoleId === role.roleId;
       return `<div class="role-card"><h3>${escapeHtml(role.roleLabel)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
     }).join('');
-    el.roleList.querySelectorAll('[data-role]').forEach(btn => { btn.onclick = () => { state.selectedRoleId = btn.getAttribute('data-role'); renderRoleList(); updateJoinButton(); save(); }; });
+
+    el.roleList.querySelectorAll('[data-role]').forEach(btn => {
+      btn.onclick = () => {
+        state.selectedRoleId = btn.getAttribute('data-role');
+        renderRoleList();
+        updateJoinButton();
+        save();
+      };
+    });
   }
   function updateJoinButton(){ if(!state.tableId && el.tableSelect?.value) state.tableId = el.tableSelect.value; el.joinTableBtn.disabled = !(state.playerName && state.selectedRoleId && state.tableId); }
   async function findSession(){
