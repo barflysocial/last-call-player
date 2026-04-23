@@ -674,7 +674,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       try{
         await joinTable();
       } catch(err){
-        toast('Join failed', err.message || 'Solo join request failed.');
+        toast('Join failed', err.message || 'Solo join request failed. If this team already has players, use Multiplayer or choose an empty team.');
       }
     };
     el.backHomeBtn.onclick=()=>switchScreen('home');
