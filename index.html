@@ -100,7 +100,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then enter your name and choose your role.</div><div class="mini" style="margin-top:10px"></div>
+        <div class="body">Enter the session code from the host, then enter your name. Solo Player lets you join first and choose your role after joining.</div><div class="mini" style="margin-top:10px"></div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -115,7 +115,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       </div>
             <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
-      <div class="field"><div class="label">Play Mode</div><div class="roles" id="playModeList"></div></div>
+      <div class="field"><div class="label">Play Mode</div><div class="roles" id="playModeList"></div><div class="mini" style="margin-top:8px">Use Solo Player to join first, then pick your role after joining.</div></div>
       <div class="field" id="roleField"><div class="label">Role</div><div class="roles" id="roleList"></div></div>
       <button id="joinTableBtn" type="button" disabled>Join</button>
     </section>
@@ -311,16 +311,12 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
   function renderPlayModeList(){
     if(!el.playModeList) return;
-    const t = currentTable();
-    const isStrictTeam = (t?.mode || '').toLowerCase() === 'team';
-    const modes = isStrictTeam
-      ? [{id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}]
-      : [
-          {id:'solo', label:'Solo Player', desc:'Join first. Choose your role after joining.'},
-          {id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}
-        ];
+    const modes = [
+      {id:'solo', label:'Solo Player', desc:'Join first. Choose your role after joining.'},
+      {id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}
+    ];
 
-    if(!modes.find(m => m.id === state.playMode)) state.playMode = modes[0]?.id || 'solo';
+    if(!modes.find(m => m.id === state.playMode)) state.playMode = 'solo';
 
     el.playModeList.innerHTML = modes.map(mode => {
       const selected = state.playMode === mode.id;
@@ -385,7 +381,15 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       const disabled = !!role.claimed;
       const selected = state.selectedRoleId === role.roleId;
       return `<div class="role-card"><h3>${escapeHtml(roleLabel)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button type="button" class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
-    }).join('') || '<div class="mini">No roles loaded. Use Solo Player to join first, then choose a role after joining.</div>';
+    }).join('');
+
+    if(!el.roleList.innerHTML.trim()){
+      state.playMode = 'solo';
+      if (el.roleField) el.roleField.style.display = 'none';
+      el.roleList.innerHTML = '<div class="mini">No role list loaded. Switching to Solo Player mode so you can continue.</div>';
+      updateJoinButton();
+      return;
+    }
 
     el.roleList.querySelectorAll('[data-role]').forEach(btn => {
       btn.onclick = () => {
@@ -399,8 +403,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function updateJoinButton(){
     const needsRole = state.playMode !== 'solo';
     const ok = !!(state.playerName && state.tableId && (!needsRole || state.selectedRoleId));
-    el.joinTableBtn.disabled = !ok;
     if(el.joinTableBtn){
+      el.joinTableBtn.disabled = !ok;
       el.joinTableBtn.textContent = (state.playMode === 'solo') ? 'Join Solo Game' : 'Claim Role & Join';
     }
   }
@@ -417,6 +421,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     }
     state.tableId = tables[0].tableId;
     state.selectedRoleId = '';
+    state.playMode = 'solo';
     switchScreen('join');
     renderJoin();
     connectWs();
