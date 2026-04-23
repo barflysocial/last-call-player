@@ -175,6 +175,14 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     accuse:{label:'Accuse',icon:'⚖️',desc:'Submit your final accusation in the last 15 minutes.'}
   };
   const ROLE_LABELS = {bartender:'Bartender',security:'Security',host:'Karaoke Host',manager:'Manager',ex_lover:'Ex-Lover',sound_tech:'Sound Tech'};
+  const FALLBACK_ROLE_LABELS = {
+    bartender:'Bartender',
+    security:'Security',
+    host:'Karaoke Host',
+    manager:'Manager',
+    ex_lover:'Ex-Lover',
+    sound_tech:'Sound Tech'
+  };
   const DEFAULT_ANSWERS = {
     killer:['Bartender','Security','Karaoke Host','Manager','Ex-Lover','Sound Tech'],
     motive:[], method:[], evidence:[]
@@ -298,17 +306,21 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function answerChoices(){return state.privateView?.answerChoices || DEFAULT_ANSWERS}
   function isSoloTable(){
     const t = currentTable();
-    return (t?.mode || 'team') === 'solo';
+    return (t?.mode || '').toLowerCase() === 'solo';
   }
 
   function renderPlayModeList(){
     if(!el.playModeList) return;
-    const modes = isSoloTable()
-      ? [{id:'solo', label:'Solo Player', desc:'Join first. Choose your role after joining.'},
-         {id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}]
-      : [{id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}];
+    const t = currentTable();
+    const isStrictTeam = (t?.mode || '').toLowerCase() === 'team';
+    const modes = isStrictTeam
+      ? [{id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}]
+      : [
+          {id:'solo', label:'Solo Player', desc:'Join first. Choose your role after joining.'},
+          {id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}
+        ];
 
-    if(!modes.find(m => m.id === state.playMode)) state.playMode = modes[0]?.id || 'multi';
+    if(!modes.find(m => m.id === state.playMode)) state.playMode = modes[0]?.id || 'solo';
 
     el.playModeList.innerHTML = modes.map(mode => {
       const selected = state.playMode === mode.id;
@@ -336,7 +348,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(table?.tableId) state.tableId = table.tableId;
 
     el.joinSessionTitle.textContent = state.session.title || 'Last Call';
-    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Play Mode:</strong> ${escapeHtml(state.playMode === "solo" ? "Solo Player" : "Multiplayer")}</div><div><strong>Role:</strong> ${escapeHtml((state.playMode === "solo" && isSoloTable()) ? "Choose after joining" : (ROLE_LABELS[state.selectedRoleId] || "Not selected"))}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
+    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Play Mode:</strong> ${escapeHtml(state.playMode === "solo" ? "Solo Player" : "Multiplayer")}</div><div><strong>Role:</strong> ${escapeHtml((state.playMode === "solo") ? "Choose after joining" : ((ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId]) || "Not selected"))}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
     el.playerNameInput.value = state.playerName || '';
     el.instagramInput.value = state.instagramTag || '';
     renderPlayModeList();
@@ -346,30 +358,34 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function renderRoleList(){
     const table = currentTable();
     const players = normalizePlayers(table?.players);
-    const fallbackClaims = Object.keys(ROLE_LABELS).map(roleId => {
-      const claimedPlayer = players.find(p => p.roleId === roleId);
-      return {
-        roleId,
-        roleLabel: ROLE_LABELS[roleId],
-        claimed: Boolean(claimedPlayer),
-        playerName: claimedPlayer?.playerName || null,
-        playerId: claimedPlayer?.playerId || claimedPlayer?.id || null,
-      };
-    });
-    const claims = Array.isArray(table?.roleClaims) && table.roleClaims.length ? table.roleClaims : fallbackClaims;
+    const roleSource = (Object.keys(ROLE_LABELS || {}).length ? ROLE_LABELS : FALLBACK_ROLE_LABELS);
+    const roleIds = Object.keys(roleSource);
 
-    if (el.roleField) el.roleField.style.display = (state.playMode === 'solo' && isSoloTable()) ? 'none' : '';
+    if (el.roleField) el.roleField.style.display = (state.playMode === 'solo') ? 'none' : '';
 
-    if(state.playMode === 'solo' && isSoloTable()){
+    if(state.playMode === 'solo'){
       el.roleList.innerHTML = '<div class="mini">Solo player mode skips role selection during sign-in. You can choose your role after joining.</div>';
       return;
     }
 
+    const fallbackClaims = roleIds.map(roleId => {
+      const claimedPlayer = players.find(p => p.roleId === roleId);
+      return {
+        roleId,
+        roleLabel: roleSource[roleId],
+        claimed: Boolean(claimedPlayer),
+        playerName: claimedPlayer?.playerName || null,
+      };
+    });
+
+    const claims = Array.isArray(table?.roleClaims) && table.roleClaims.length ? table.roleClaims : fallbackClaims;
+
     el.roleList.innerHTML = claims.map(role => {
+      const roleLabel = role.roleLabel || roleSource[role.roleId] || role.roleId;
       const disabled = !!role.claimed;
       const selected = state.selectedRoleId === role.roleId;
-      return `<div class="role-card"><h3>${escapeHtml(role.roleLabel || ROLE_LABELS[role.roleId] || role.roleId)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button type="button" class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
-    }).join('');
+      return `<div class="role-card"><h3>${escapeHtml(roleLabel)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button type="button" class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
+    }).join('') || '<div class="mini">No roles loaded. Use Solo Player to join first, then choose a role after joining.</div>';
 
     el.roleList.querySelectorAll('[data-role]').forEach(btn => {
       btn.onclick = () => {
@@ -381,11 +397,11 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     });
   }
   function updateJoinButton(){
-    const needsRole = !(state.playMode === 'solo' && isSoloTable());
+    const needsRole = state.playMode !== 'solo';
     const ok = !!(state.playerName && state.tableId && (!needsRole || state.selectedRoleId));
     el.joinTableBtn.disabled = !ok;
     if(el.joinTableBtn){
-      el.joinTableBtn.textContent = (state.playMode === 'solo' && isSoloTable()) ? 'Join Solo Game' : 'Claim Role & Join';
+      el.joinTableBtn.textContent = (state.playMode === 'solo') ? 'Join Solo Game' : 'Claim Role & Join';
     }
   }
   async function findSession(){
@@ -641,7 +657,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.joinTableBtn.onclick=async()=>{
       if(!state.playerName) return toast('Missing name','Enter your name first.');
       if(!state.tableId) return toast('Missing team','No team is selected for this session.');
-      if(!(state.playMode === 'solo' && isSoloTable()) && !state.selectedRoleId) return toast('Missing role','Choose an open role first.');
+      if(state.playMode !== 'solo' && !state.selectedRoleId) return toast('Missing role','Choose an open role first.');
       try{ await joinTable(); } catch(err){ toast('Join failed', err.message); }
     };
     el.backHomeBtn.onclick=()=>switchScreen('home');
