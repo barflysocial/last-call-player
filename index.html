@@ -487,21 +487,74 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function formatClock(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
   function timeRemainingSec(){ return Math.max(0, 2700 - elapsedSec()); }
   function renderHome(){
-    const pv=state.privateView;
+    const pv = state.privateView;
     el.heroPlayer.textContent = pv?.player?.playerName || state.playerName || 'Player';
-    const roleLabel = pv?.player?.roleLabel || ROLE_LABELS[state.selectedRoleId] || 'Role';
+    const roleLabel = pv?.player?.roleLabel || ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId] || 'Role';
     const roleName = pv?.player?.roleInfo?.character_name || '';
     el.heroRole.textContent = roleName ? `${roleLabel} — ${roleName}` : roleLabel;
     el.phaseBadge.textContent = currentPhase();
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
     el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
-    const apps=Object.keys(APP_META);
+
+    // Critical fix: show role chooser after solo join if no role has been selected yet.
+    if (el.postJoinRoleCard && el.postJoinRoleList) {
+      const table = currentTable();
+      const players = normalizePlayers(table?.players);
+      const roleSource = (Object.keys(ROLE_LABELS || {}).length ? ROLE_LABELS : FALLBACK_ROLE_LABELS);
+      const needsPostJoinRole = state.playMode === 'solo' && !pv?.player?.roleId;
+
+      if (needsPostJoinRole) {
+        el.postJoinRoleCard.style.display = 'block';
+        const claims = Object.keys(roleSource).map(roleId => {
+          const claimedPlayer = players.find(p => p.roleId === roleId);
+          return {
+            roleId,
+            roleLabel: roleSource[roleId],
+            claimed: Boolean(claimedPlayer),
+            playerName: claimedPlayer?.playerName || null,
+          };
+        });
+
+        el.postJoinRoleList.innerHTML = claims.map(role => `
+          <div class="role-card">
+            <h3>${escapeHtml(role.roleLabel)}</h3>
+            <div class="meta">${role.claimed ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div>
+            <button type="button" class="secondary" data-post-role="${role.roleId}" ${role.claimed ? 'disabled' : ''}>${role.claimed ? 'Unavailable' : 'Choose Role'}</button>
+          </div>
+        `).join('');
+
+        el.postJoinRoleList.querySelectorAll('[data-post-role]').forEach(btn => {
+          btn.onclick = async () => {
+            try{
+              await chooseRoleAfterJoin(btn.getAttribute('data-post-role'));
+            }catch(err){
+              toast('Role select failed', err.message);
+            }
+          };
+        });
+      } else {
+        el.postJoinRoleCard.style.display = 'none';
+        el.postJoinRoleList.innerHTML = '';
+      }
+    }
+
+    const apps = Object.keys(APP_META);
     el.homeGrid.innerHTML = apps.map(appId => {
       const locked = appId==='accuse' && !currentPhase().startsWith('accusation');
       const count = unreadCount(appId);
       return `<button class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
     }).join('');
-    el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => { btn.onclick = () => { const appId=btn.getAttribute('data-open-app'); if(appId==='accuse' && !currentPhase().startsWith('accusation')){ toast('Accuse locked','This opens during accusation phase.'); return; } state.currentApp=appId; switchScreen('app'); }; });
+    el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
+      btn.onclick = () => {
+        const appId=btn.getAttribute('data-open-app');
+        if(appId==='accuse' && !currentPhase().startsWith('accusation')){
+          toast('Accuse locked','This opens during accusation phase.');
+          return;
+        }
+        state.currentApp=appId;
+        switchScreen('app');
+      };
+    });
   }
   function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
   function renderApp(){
