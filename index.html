@@ -261,7 +261,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       state.accusationDraft = {killer:null,motive:null,method:null,evidence:null};
       state.timerBaseElapsedSec = 0;
       state.timerBaseCapturedAt = 0;
-    }catch{}
+    }catch{ startLivePolling(); }
   }
 
   function checkForNewUnlocks(privateView){
@@ -432,11 +432,12 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     switchScreen('join');
     renderJoin();
     connectWs();
+    startLivePolling();
     toast('Session found', data.code);
   }
   async function joinTable(){
     const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId || null, playMode:state.playMode})});
-    state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); switchScreen('home'); toast('Joined game', state.playMode === 'solo' ? 'Solo player connected.' : ((ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId]) || 'Role claimed.'));
+    state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); startLivePolling(); switchScreen('home'); toast('Joined game', state.playMode === 'solo' ? 'Solo player connected.' : ((ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId]) || 'Role claimed.'));
   }
   async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); renderCurrent();}
   function wsUrlFromHttp(httpUrl){const u=new URL(httpUrl); u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'; u.pathname=''; u.search=''; u.hash=''; return u.toString().replace(/\/$/,'');}
@@ -496,7 +497,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
     el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
 
-    // Critical fix: show role chooser after solo join if no role has been selected yet.
+    const latestHostMessage = (pv?.hostMessages || []).slice(-1)[0];
+    if (el.hostMessageCard && el.hostMessageBody) {
+      if (latestHostMessage?.message) {
+        el.hostMessageCard.style.display = 'block';
+        el.hostMessageBody.textContent = latestHostMessage.message;
+      } else {
+        el.hostMessageCard.style.display = 'none';
+        el.hostMessageBody.textContent = '';
+      }
+    }
+
     if (el.postJoinRoleCard && el.postJoinRoleList) {
       const table = currentTable();
       const players = normalizePlayers(table?.players);
@@ -663,7 +674,27 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
   function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home') renderHome(); if(state.currentScreen==='app') renderApp(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
+  let livePollHandle = null;
+
+  function startLivePolling(){
+    if(livePollHandle) clearInterval(livePollHandle);
+    livePollHandle = setInterval(async () => {
+      if(!state.session?.sessionId) return;
+      try{
+        await refreshSessionAndPlayer();
+      }catch{}
+    }, 3000);
+  }
+
+  function stopLivePolling(){
+    if(livePollHandle){
+      clearInterval(livePollHandle);
+      livePollHandle = null;
+    }
+  }
+
   function resetLocal(){
+    stopLivePolling();
     try{ if(state.ws){ state.ws.close(); state.ws=null; } }catch{}
     try{ localStorage.removeItem(STORAGE_KEY); }catch{}
     state.session = null;
@@ -732,7 +763,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     };
     el.backHomeBtn.onclick=()=>switchScreen('home');
     el.openAccuseBtn.onclick=()=>{ state.currentApp='accuse'; switchScreen('app'); };
-    if(state.session?.sessionId){ connectWs(); if(state.playerId && state.tableId){ refreshSessionAndPlayer().catch(()=>{}); switchScreen('home'); } else { switchScreen('join'); } } else { switchScreen('connect'); }
+    if(state.session?.sessionId){ connectWs(); startLivePolling(); if(state.playerId && state.tableId){ refreshSessionAndPlayer().catch(()=>{}); switchScreen('home'); } else { switchScreen('join'); } } else { switchScreen('connect'); }
     setInterval(()=>{ renderCurrent(); },1000);
   }
   bind();
