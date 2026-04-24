@@ -113,7 +113,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
-      <div class="field"><div class="label">Detective Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
+      <div class="field"><div class="label">Detective Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your detective name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
       <button id="joinTableBtn" type="button" disabled>Join Investigation</button>
     </section>
@@ -126,17 +126,25 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
-          <div class="badge" id="phaseBadge">Lobby</div>
+          <div class="badge" id="phaseBadge">Investigation</div>
         </div>
         <div class="timer">
           <div class="timer-pill" id="timeRemaining">Time Left — 45:00</div>
           <div class="timer-pill" id="rolePrompt">Waiting for host to start.</div>
         </div>
       </div>
-      <div class="card" id="clueLaneCard" style="display:none"><div class="tiny">Adaptive Clue Lane</div><div class="body" id="clueLaneBody"></div></div>
-      <div class="card" id="hostMessageCard" style="display:none"><div class="tiny">Host Message</div><div class="body" id="hostMessageBody"></div></div><div class="body" style="margin-bottom:10px">Solo player mode lets you join first. Pick your role here.</div><div class="roles" id="postJoinRoleList"></div></div>
+      <div class="card" id="hostMessageCard" style="display:none">
+        <div class="tiny">Host Message</div>
+        <div class="body" id="hostMessageBody"></div>
+      </div>
       <div class="home-grid" id="homeGrid"></div>
-      <div class="card"><div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="helpBtn">Help</button><button class="secondary" id="testSoundBtn">Test Sound</button><button class="secondary" id="leaveSessionBtn">Leave Session</button></div></div>
+      <div class="card">
+        <div class="share-actions" style="justify-content:flex-start">
+          <button class="secondary" id="helpBtn">Help</button>
+          <button class="secondary" id="testSoundBtn">Test Sound</button>
+          <button class="secondary" id="leaveSessionBtn">Leave Session</button>
+        </div>
+      </div>
     </section>
 
     <section class="screen" id="screen-app">
@@ -299,7 +307,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     return (t?.mode || '').toLowerCase() === 'solo';
   }
 
-  function renderPlayModeList(){}
+  
 
   function renderJoin(){
     if(!state.session) return;
@@ -315,7 +323,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.instagramInput.value = state.instagramTag || '';
     updateJoinButton();
   }
-  function renderRoleList(){}
+  
   function updateJoinButton(){
     const ok = !!(state.playerName && state.tableId);
     if(el.joinTableBtn){
@@ -407,7 +415,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     const pv = state.privateView;
     el.heroPlayer.textContent = pv?.player?.playerName || state.playerName || 'Detective';
     el.heroRole.textContent = 'Detective';
-    el.phaseBadge.textContent = currentPhase();
+    el.phaseBadge.textContent = currentPhase() === 'lobby' ? 'Investigation' : currentPhase();
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
     el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Investigate the evidence.';
 
@@ -426,16 +434,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.homeGrid.innerHTML = apps.map(appId => {
       const locked = appId==='accuse' && !currentPhase().startsWith('accusation');
       const count = unreadCount(appId);
-      return `<button class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
+      return `<button type="button" class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
     }).join('');
+
     el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
       btn.onclick = () => {
-        const appId=btn.getAttribute('data-open-app');
+        const appId = btn.getAttribute('data-open-app');
         if(appId==='accuse' && !currentPhase().startsWith('accusation')){
           toast('Accuse locked','This opens during accusation phase.');
           return;
         }
-        state.currentApp=appId;
+        state.currentApp = appId;
         switchScreen('app');
       };
     });
