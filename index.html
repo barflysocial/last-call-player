@@ -94,13 +94,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Connected Player App — Truth-Pack Aware</div>
+      <div class="subtitle">Detective Player App — Unified Evidence</div>
     </div>
 
     <section class="screen active" id="screen-connect">
       <div class="card">
         <h2>Connect to Session</h2>
-        <div class="body">Enter the session code from the host, then enter your name. Solo Player lets you join first and choose your role after joining.</div><div class="mini" style="margin-top:10px"></div>
+        <div class="body">Enter the session code from the host, then enter your detective name to join the investigation.</div><div class="mini" style="margin-top:10px"></div>
       </div>
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
@@ -115,16 +115,15 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       </div>
             <div class="field"><div class="label">Player Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
-      <div class="field"><div class="label">Play Mode</div><div class="roles" id="playModeList"></div><div class="mini" id="playModeHint" style="margin-top:8px">Solo Player is the default. Join first, then pick your role after joining.</div></div>
-      <div class="field" id="roleField"><div class="label">Role</div><div class="roles" id="roleList"></div><div class="mini" id="soloJoinHint" style="margin-top:8px;display:none">Solo Player skips this step. Join first, then choose your role on the next screen.</div></div>
-      <button id="joinTableBtn" type="button" disabled>Join</button>
+      <div class="roles" id="roleList"></div><div class="mini" id="soloJoinHint" style="margin-top:8px;display:none">Solo Player skips this step. Join first, then choose your role on the next screen.</div></div>
+      <button id="joinTableBtn" type="button" disabled>Join Investigation</button>
     </section>
 
     <section class="screen" id="screen-home">
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Player</div>
+            <div class="tiny">Detective</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -136,8 +135,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         </div>
       </div>
       <div class="card" id="clueLaneCard" style="display:none"><div class="tiny">Adaptive Clue Lane</div><div class="body" id="clueLaneBody"></div></div>
-      <div class="card" id="hostMessageCard" style="display:none"><div class="tiny">Host Message</div><div class="body" id="hostMessageBody"></div></div>
-<div class="card" id="postJoinRoleCard" style="display:none"><div class="tiny">Choose Role</div><div class="body" style="margin-bottom:10px">Solo player mode lets you join first. Pick your role here.</div><div class="roles" id="postJoinRoleList"></div></div>
+      <div class="card" id="hostMessageCard" style="display:none"><div class="tiny">Host Message</div><div class="body" id="hostMessageBody"></div></div><div class="body" style="margin-bottom:10px">Solo player mode lets you join first. Pick your role here.</div><div class="roles" id="postJoinRoleList"></div></div>
       <div class="home-grid" id="homeGrid"></div>
       <div class="card"><div class="share-actions" style="justify-content:flex-start"><button class="secondary" id="helpBtn">Help</button><button class="secondary" id="testSoundBtn">Test Sound</button><button class="secondary" id="leaveSessionBtn">Leave Session</button></div></div>
     </section>
@@ -189,7 +187,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   };
   const state = {
     backendUrl:'https://last-call-backend-rnc8.onrender.com',
-    session:null, tableId:'', selectedRoleId:'', playMode:'solo', playerName:'', instagramTag:'', playerId:'',
+    session:null, tableId:'', selectedRoleId:'', playerName:'', instagramTag:'', playerId:'',
     privateView:null, currentScreen:'connect', currentApp:'', viewed:{}, ws:null,
     accusationDraft:{killer:null,motive:null,method:null,evidence:null},
     soundEnabled:true,
@@ -210,9 +208,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     joinSessionMeta:document.getElementById('joinSessionMeta'),
     playerNameInput:document.getElementById('playerNameInput'),
     instagramInput:document.getElementById('instagramInput'),
-    playModeList:document.getElementById('playModeList'),
-    roleField:document.getElementById('roleField'),
-    roleList:document.getElementById('roleList'),
     joinTableBtn:document.getElementById('joinTableBtn'),
     heroPlayer:document.getElementById('heroPlayer'),
     heroRole:document.getElementById('heroRole'),
@@ -223,8 +218,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     clueLaneBody:document.getElementById('clueLaneBody'),
     hostMessageCard:document.getElementById('hostMessageCard'),
     hostMessageBody:document.getElementById('hostMessageBody'),
-    postJoinRoleCard:document.getElementById('postJoinRoleCard'),
-    postJoinRoleList:document.getElementById('postJoinRoleList'),
     homeGrid:document.getElementById('homeGrid'),
     helpBtn:document.getElementById('helpBtn'),
     testSoundBtn:document.getElementById('testSoundBtn'),
@@ -250,8 +243,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       state.session = null;
       state.tableId = '';
       state.selectedRoleId = '';
-    state.playMode = 'solo';
-      state.playMode = 'solo';
       state.playerName = '';
       state.playerId = '';
       state.privateView = null;
@@ -309,36 +300,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     return (t?.mode || '').toLowerCase() === 'solo';
   }
 
-  function renderPlayModeList(){
-    if(!el.playModeList) return;
-    state.playMode = state.playMode || 'solo';
-    const modes = [
-      {id:'solo', label:'Solo Player', desc:'Join first. Choose your role after joining.'},
-      {id:'multi', label:'Multiplayer', desc:'Choose a role before joining.'}
-    ];
-
-    el.playModeList.innerHTML = modes.map(mode => {
-      const selected = state.playMode === mode.id;
-      return `<div class="role-card"><h3>${escapeHtml(mode.label)}</h3><div class="meta">${escapeHtml(mode.desc)}</div><button type="button" class="${selected ? '' : 'secondary'}" data-play-mode="${mode.id}">${selected ? 'Selected' : 'Choose'}</button></div>`;
-    }).join('');
-
-    // hard fallback in case rendering fails for some reason
-    if(!el.playModeList.innerHTML.trim()){
-      el.playModeList.innerHTML = `<div class="role-card"><h3>Solo Player</h3><div class="meta">Join first. Choose your role after joining.</div><button type="button" data-play-mode="solo">Selected</button></div>`;
-      state.playMode = 'solo';
-    }
-
-    el.playModeList.querySelectorAll('[data-play-mode]').forEach(btn => {
-      btn.onclick = () => {
-        state.playMode = btn.getAttribute('data-play-mode') || 'solo';
-        if(state.playMode === 'solo') state.selectedRoleId = '';
-        renderPlayModeList();
-        renderRoleList();
-        updateJoinButton();
-        save();
-      };
-    });
-  }
+  function renderPlayModeList(){}
 
   function renderJoin(){
     if(!state.session) return;
@@ -349,70 +311,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(table?.tableId) state.tableId = table.tableId;
 
     el.joinSessionTitle.textContent = state.session.title || 'Last Call';
-    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Mode:</strong> ${escapeHtml(table?.mode || 'team')}</div><div><strong>Play Mode:</strong> ${escapeHtml(state.playMode === "solo" ? "Solo Player" : "Multiplayer")}</div><div><strong>Role:</strong> ${escapeHtml((state.playMode === "solo") ? "Choose after joining" : ((ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId]) || "Not selected"))}</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
+    el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Perspective:</strong> Detective</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
     el.playerNameInput.value = state.playerName || '';
     el.instagramInput.value = state.instagramTag || '';
-    renderPlayModeList();
-    renderRoleList();
     updateJoinButton();
   }
-  function renderRoleList(){
-    const table = currentTable();
-    const players = normalizePlayers(table?.players);
-    const roleSource = (Object.keys(ROLE_LABELS || {}).length ? ROLE_LABELS : FALLBACK_ROLE_LABELS);
-    const roleIds = Object.keys(roleSource);
-
-    if (el.roleField) el.roleField.style.display = (state.playMode === 'solo') ? 'none' : '';
-    const soloJoinHint = document.getElementById('soloJoinHint'); if(soloJoinHint) soloJoinHint.style.display = (state.playMode === 'solo') ? '' : 'none';
-
-    if(state.playMode === 'solo'){
-      el.roleList.innerHTML = '<div class="mini">Solo player mode skips role selection during sign-in. You can choose your role after joining.</div>';
-      return;
-    }
-
-    const fallbackClaims = roleIds.map(roleId => {
-      const claimedPlayer = players.find(p => p.roleId === roleId);
-      return {
-        roleId,
-        roleLabel: roleSource[roleId],
-        claimed: Boolean(claimedPlayer),
-        playerName: claimedPlayer?.playerName || null,
-      };
-    });
-
-    const claims = Array.isArray(table?.roleClaims) && table.roleClaims.length ? table.roleClaims : fallbackClaims;
-
-    el.roleList.innerHTML = claims.map(role => {
-      const roleLabel = role.roleLabel || roleSource[role.roleId] || role.roleId;
-      const disabled = !!role.claimed;
-      const selected = state.selectedRoleId === role.roleId;
-      return `<div class="role-card"><h3>${escapeHtml(roleLabel)}</h3><div class="meta">${disabled ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div><button type="button" class="${selected ? '' : 'secondary'}" data-role="${role.roleId}" ${disabled ? 'disabled' : ''}>${selected ? 'Selected' : (disabled ? 'Unavailable' : 'Choose Role')}</button></div>`;
-    }).join('');
-
-    if(!el.roleList.innerHTML.trim()){
-      state.playMode = 'solo';
-      if (el.roleField) el.roleField.style.display = 'none';
-      el.roleList.innerHTML = '<div class="mini">No role list loaded. Switching to Solo Player mode so you can continue.</div>';
-      updateJoinButton();
-      return;
-    }
-
-    el.roleList.querySelectorAll('[data-role]').forEach(btn => {
-      btn.onclick = () => {
-        state.selectedRoleId = btn.getAttribute('data-role');
-        renderRoleList();
-        updateJoinButton();
-        save();
-      };
-    });
-  }
+  function renderRoleList(){}
   function updateJoinButton(){
-    state.playMode = state.playMode || 'solo';
-    const needsRole = state.playMode !== 'solo';
-    const ok = !!(state.playerName && state.tableId && (!needsRole || state.selectedRoleId));
+    const ok = !!(state.playerName && state.tableId);
     if(el.joinTableBtn){
       el.joinTableBtn.disabled = !ok;
-      el.joinTableBtn.textContent = (state.playMode === 'solo') ? 'Join Solo Game' : 'Claim Role & Join';
+      el.joinTableBtn.textContent = 'Join Investigation';
     }
   }
   async function findSession(){
@@ -428,7 +337,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     }
     state.tableId = tables[0].tableId;
     state.selectedRoleId = '';
-    state.playMode = 'solo';
     switchScreen('join');
     renderJoin();
     connectWs();
@@ -436,8 +344,17 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     toast('Session found', data.code);
   }
   async function joinTable(){
-    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {method:'POST', body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag, roleId:state.selectedRoleId || null, playMode:state.playMode})});
-    state.playerId = data.player.playerId; state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); startLivePolling(); switchScreen('home'); toast('Joined game', state.playMode === 'solo' ? 'Solo player connected.' : ((ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId]) || 'Role claimed.'));
+    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {
+      method:'POST',
+      body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag})
+    });
+    state.playerId = data.player.playerId;
+    state.privateView = data;
+    state.timerBaseElapsedSec = Number(data?.elapsedSec || 0);
+    state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0);
+    startLivePolling();
+    switchScreen('home');
+    toast('Joined investigation', 'Detective connected.');
   }
   async function refreshPlayerState(){if(!state.session?.sessionId || !state.tableId || !state.playerId) return; const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}`); checkForNewUnlocks(data); state.privateView = data; state.timerBaseElapsedSec = Number(data?.elapsedSec || 0); state.timerBaseCapturedAt = (data?.startedAt ? Date.now() : 0); renderCurrent();}
   function wsUrlFromHttp(httpUrl){const u=new URL(httpUrl); u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'; u.pathname=''; u.search=''; u.hash=''; return u.toString().replace(/\/$/,'');}
@@ -489,13 +406,11 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function timeRemainingSec(){ return Math.max(0, 2700 - elapsedSec()); }
   function renderHome(){
     const pv = state.privateView;
-    el.heroPlayer.textContent = pv?.player?.playerName || state.playerName || 'Player';
-    const roleLabel = pv?.player?.roleLabel || ROLE_LABELS[state.selectedRoleId] || FALLBACK_ROLE_LABELS[state.selectedRoleId] || 'Role';
-    const roleName = pv?.player?.roleInfo?.character_name || '';
-    el.heroRole.textContent = roleName ? `${roleLabel} — ${roleName}` : roleLabel;
+    el.heroPlayer.textContent = pv?.player?.playerName || state.playerName || 'Detective';
+    el.heroRole.textContent = 'Detective';
     el.phaseBadge.textContent = currentPhase();
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
-    el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Stay moving and compare notes.';
+    el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Investigate the evidence.';
 
     const latestHostMessage = (pv?.hostMessages || []).slice(-1)[0];
     if (el.hostMessageCard && el.hostMessageBody) {
@@ -505,47 +420,6 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       } else {
         el.hostMessageCard.style.display = 'none';
         el.hostMessageBody.textContent = '';
-      }
-    }
-
-    if (el.postJoinRoleCard && el.postJoinRoleList) {
-      const table = currentTable();
-      const players = normalizePlayers(table?.players);
-      const roleSource = (Object.keys(ROLE_LABELS || {}).length ? ROLE_LABELS : FALLBACK_ROLE_LABELS);
-      const needsPostJoinRole = state.playMode === 'solo' && !pv?.player?.roleId;
-
-      if (needsPostJoinRole) {
-        el.postJoinRoleCard.style.display = 'block';
-        const claims = Object.keys(roleSource).map(roleId => {
-          const claimedPlayer = players.find(p => p.roleId === roleId);
-          return {
-            roleId,
-            roleLabel: roleSource[roleId],
-            claimed: Boolean(claimedPlayer),
-            playerName: claimedPlayer?.playerName || null,
-          };
-        });
-
-        el.postJoinRoleList.innerHTML = claims.map(role => `
-          <div class="role-card">
-            <h3>${escapeHtml(role.roleLabel)}</h3>
-            <div class="meta">${role.claimed ? `Claimed by ${escapeHtml(role.playerName || 'another player')}` : 'Open role'}</div>
-            <button type="button" class="secondary" data-post-role="${role.roleId}" ${role.claimed ? 'disabled' : ''}>${role.claimed ? 'Unavailable' : 'Choose Role'}</button>
-          </div>
-        `).join('');
-
-        el.postJoinRoleList.querySelectorAll('[data-post-role]').forEach(btn => {
-          btn.onclick = async () => {
-            try{
-              await chooseRoleAfterJoin(btn.getAttribute('data-post-role'));
-            }catch(err){
-              toast('Role select failed', err.message);
-            }
-          };
-        });
-      } else {
-        el.postJoinRoleCard.style.display = 'none';
-        el.postJoinRoleList.innerHTML = '';
       }
     }
 
@@ -603,17 +477,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(submitBtn){ submitBtn.onclick = async () => { try{ await submitAccusation(); } catch(err){ toast('Submit failed', err.message); } }; }
   }
   function canSubmitAccuse(){ return ['killer','motive','method','evidence'].every(k => !!state.accusationDraft[k]); }
-  async function chooseRoleAfterJoin(roleId){
-    if(!state.session?.sessionId || !state.tableId || !state.playerId) return;
-    const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/players/${state.playerId}/role`, {
-      method:'POST',
-      body:JSON.stringify({ roleId })
-    });
-    state.privateView = data;
-    state.selectedRoleId = data?.player?.roleId || roleId;
-    renderCurrent();
-    toast('Role selected', ROLE_LABELS[state.selectedRoleId] || state.selectedRoleId);
-  }
+  
 
   async function sendHelpRequest(){
     if(!state.session?.sessionId || !state.tableId) return;
@@ -751,14 +615,12 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
     el.joinTableBtn.onclick=async()=>{
-      state.playMode = state.playMode || 'solo';
       if(!state.playerName) return toast('Missing name','Enter your name first.');
       if(!state.tableId) return toast('Missing team','No team is selected for this session.');
-      if(state.playMode !== 'solo' && !state.selectedRoleId) return toast('Missing role','Choose an open role first.');
       try{
         await joinTable();
       } catch(err){
-        toast('Join failed', err.message || 'Solo join request failed. If this team already has players, use Multiplayer or choose an empty team.');
+        toast('Join failed', err.message || 'Join request failed.');
       }
     };
     el.backHomeBtn.onclick=()=>switchScreen('home');
