@@ -94,7 +94,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.19 PLAYER · BUILD 2.5.19 PLAYER</div>
+      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.20 PLAYER · BUILD 2.5.20 PLAYER</div>
     </div>
 
     <section class="screen active" id="screen-connect">
@@ -109,7 +109,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
     <section class="screen" id="screen-join">
       <div class="card">
-        <div class="tiny">Session · BUILD 2.5.19 PLAYER</div>
+        <div class="tiny">Session · BUILD 2.5.20 PLAYER</div>
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
@@ -122,7 +122,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Detective · BUILD 2.5.19 PLAYER</div>
+            <div class="tiny">Detective · BUILD 2.5.20 PLAYER</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -139,7 +139,19 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       </div>
       <div class="card">
         <div class="tiny">Investigation Apps</div>
-        <div class="home-grid" id="homeGrid"></div>
+        <div class="home-grid" id="homeGrid">
+          <button type="button" class="icon" data-open-app="phone"><div class="icon-symbol">📞</div><div class="icon-label">Phone</div></button>
+          <button type="button" class="icon" data-open-app="messages"><div class="icon-symbol">💬</div><div class="icon-label">Messages</div></button>
+          <button type="button" class="icon" data-open-app="maps"><div class="icon-symbol">🗺️</div><div class="icon-label">Maps</div></button>
+          <button type="button" class="icon" data-open-app="bank"><div class="icon-symbol">🏦</div><div class="icon-label">Bank</div></button>
+          <button type="button" class="icon" data-open-app="photos"><div class="icon-symbol">📸</div><div class="icon-label">Photos</div></button>
+          <button type="button" class="icon" data-open-app="social"><div class="icon-symbol">🌐</div><div class="icon-label">Social</div></button>
+          <button type="button" class="icon" data-open-app="contacts"><div class="icon-symbol">👥</div><div class="icon-label">Contacts</div></button>
+          <button type="button" class="icon" data-open-app="notes"><div class="icon-symbol">📝</div><div class="icon-label">Notes</div></button>
+          <button type="button" class="icon" data-open-app="files"><div class="icon-symbol">📂</div><div class="icon-label">Files</div></button>
+          <button type="button" class="icon" data-open-app="browser"><div class="icon-symbol">🧭</div><div class="icon-label">Browser</div></button>
+          <button type="button" class="icon disabled" data-open-app="accuse"><div class="icon-symbol">⚖️</div><div class="icon-label">Accuse</div></button>
+        </div>
       </div>
       <div class="card">
         <div class="share-actions" style="justify-content:flex-start">
@@ -441,20 +453,25 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         const count = unreadCount(appId);
         return `<button type="button" class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
       }).join('');
-      el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
-        btn.onclick = () => {
-          const appId = btn.getAttribute('data-open-app');
-          if(appId==='accuse' && !phase.startsWith('accusation')){
-            toast('Accuse locked','This opens during accusation phase.');
-            return;
-          }
-          state.currentApp = appId;
-          switchScreen('app');
-        };
-      });
+      bindHomeGridButtons();
     }
   }
   function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
+  function bindHomeGridButtons(){
+    if(!el.homeGrid) return;
+    el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
+      btn.onclick = () => {
+        const appId = btn.getAttribute('data-open-app');
+        const phase = currentPhase();
+        if(appId==='accuse' && !String(phase).startsWith('accusation')){
+          toast('Accuse locked','This opens during accusation phase.');
+          return;
+        }
+        state.currentApp = appId;
+        switchScreen('app');
+      };
+    });
+  }
   function renderApp(){
     const appId = state.currentApp || 'messages'; const meta=APP_META[appId];
     el.appTiny.textContent = currentPhase();
@@ -549,7 +566,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   function roundRect(ctx,x,y,w,h,r){ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();}
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
-  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home') renderHome(); if(state.currentScreen==='app') renderApp(); save(); }
+  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); } if(state.currentScreen==='app') renderApp(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
   let livePollHandle = null;
 
@@ -627,6 +644,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     bindConnectButtons();
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
+    bindHomeGridButtons();
     el.joinTableBtn.onclick=async()=>{
       if(!state.playerName) return toast('Missing name','Enter your name first.');
       if(!state.tableId) return toast('Missing team','No team is selected for this session.');
