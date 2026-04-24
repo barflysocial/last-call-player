@@ -94,7 +94,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.18 PLAYER · BUILD 2.5.18 PLAYER</div>
+      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.19 PLAYER · BUILD 2.5.19 PLAYER</div>
     </div>
 
     <section class="screen active" id="screen-connect">
@@ -109,7 +109,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
     <section class="screen" id="screen-join">
       <div class="card">
-        <div class="tiny">Session · BUILD 2.5.18 PLAYER</div>
+        <div class="tiny">Session · BUILD 2.5.19 PLAYER</div>
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
@@ -122,7 +122,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Detective · BUILD 2.5.18 PLAYER</div>
+            <div class="tiny">Detective · BUILD 2.5.19 PLAYER</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -137,7 +137,10 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div class="tiny">Host Message</div>
         <div class="body" id="hostMessageBody"></div>
       </div>
-      <div class="home-grid" id="homeGrid"></div>
+      <div class="card">
+        <div class="tiny">Investigation Apps</div>
+        <div class="home-grid" id="homeGrid"></div>
+      </div>
       <div class="card">
         <div class="share-actions" style="justify-content:flex-start">
           <button class="secondary" id="helpBtn">Help</button>
@@ -412,12 +415,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function formatClock(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
   function timeRemainingSec(){ return Math.max(0, 2700 - elapsedSec()); }
   function renderHome(){
-    const pv = state.privateView;
+    const pv = state.privateView || {};
     el.heroPlayer.textContent = pv?.player?.playerName || state.playerName || 'Detective';
     el.heroRole.textContent = 'Detective';
-    el.phaseBadge.textContent = currentPhase() === 'lobby' ? 'Investigation' : currentPhase();
+    const phase = currentPhase();
+    el.phaseBadge.textContent = phase === 'lobby' ? 'Investigation' : phase;
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
-    el.rolePrompt.textContent = currentPhase()==='lobby' ? 'Waiting for host to start.' : currentPhase().startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Investigate the evidence.';
+    el.rolePrompt.textContent = phase==='lobby' ? 'Waiting for host to start.' : phase.startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Investigate the evidence.';
 
     const latestHostMessage = (pv?.hostMessages || []).slice(-1)[0];
     if (el.hostMessageCard && el.hostMessageBody) {
@@ -430,24 +434,25 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       }
     }
 
-    const apps = Object.keys(APP_META);
-    el.homeGrid.innerHTML = apps.map(appId => {
-      const locked = appId==='accuse' && !currentPhase().startsWith('accusation');
-      const count = unreadCount(appId);
-      return `<button type="button" class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
-    }).join('');
-
-    el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
-      btn.onclick = () => {
-        const appId = btn.getAttribute('data-open-app');
-        if(appId==='accuse' && !currentPhase().startsWith('accusation')){
-          toast('Accuse locked','This opens during accusation phase.');
-          return;
-        }
-        state.currentApp = appId;
-        switchScreen('app');
-      };
-    });
+    if (el.homeGrid) {
+      const apps = Object.keys(APP_META);
+      el.homeGrid.innerHTML = apps.map(appId => {
+        const locked = appId==='accuse' && !phase.startsWith('accusation');
+        const count = unreadCount(appId);
+        return `<button type="button" class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
+      }).join('');
+      el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
+        btn.onclick = () => {
+          const appId = btn.getAttribute('data-open-app');
+          if(appId==='accuse' && !phase.startsWith('accusation')){
+            toast('Accuse locked','This opens during accusation phase.');
+            return;
+          }
+          state.currentApp = appId;
+          switchScreen('app');
+        };
+      });
+    }
   }
   function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
   function renderApp(){
