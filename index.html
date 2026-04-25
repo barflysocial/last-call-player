@@ -94,7 +94,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.23 PLAYER · BUILD 2.5.23 PLAYER</div>
+      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.25 PLAYER · BUILD 2.5.25 PLAYER</div>
     </div>
 
     <section class="screen active" id="screen-connect">
@@ -105,11 +105,15 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="field"><div class="label">Session Code</div><input id="sessionCodeInput" placeholder="Enter host code" /></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
       <div class="mini" style="margin-top:12px"><label><input type="checkbox" id="soundToggle" checked style="width:auto;margin-right:6px"> Notification sound on</label></div>
+      <div class="card" id="runtimeDiagCard" style="margin-top:12px">
+        <div class="tiny">Runtime Diagnostics · BUILD 2.5.25 PLAYER</div>
+        <div class="body" id="runtimeDiagBody">Waiting for activity…</div>
+      </div>
     </section>
 
     <section class="screen" id="screen-join">
       <div class="card">
-        <div class="tiny">Session · BUILD 2.5.23 PLAYER</div>
+        <div class="tiny">Session · BUILD 2.5.25 PLAYER</div>
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
@@ -122,7 +126,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Detective · BUILD 2.5.23 PLAYER</div>
+            <div class="tiny">Detective · BUILD 2.5.25 PLAYER</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -136,7 +140,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="card" id="hostMessageCard" style="display:none">
         <div class="tiny">Host Message</div>
         <div class="card" id="debugCard">
-        <div class="tiny">Debug · BUILD 2.5.23 PLAYER</div>
+        <div class="tiny">Debug · BUILD 2.5.25 PLAYER</div>
         <div class="body" id="debugBody">Waiting for data…</div>
       </div>
 <div class="body" id="hostMessageBody"></div>
@@ -219,7 +223,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     soundEnabled:true,
     lastUnlockCount:0,
     timerBaseElapsedSec: 0,
-    timerBaseCapturedAt: 0
+    timerBaseCapturedAt: 0,
+    runtimeDiag:{events:[], lastApi:null, lastError:null, lastFind:null, lastSessionResponse:null}
   };
   const el = {
     notificationStack:document.getElementById('notificationStack'),
@@ -258,9 +263,37 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     appEntries:document.getElementById('appEntries'),
     appExtra:document.getElementById('appExtra'),
     soundToggle:document.getElementById('soundToggle'),
+    runtimeDiagCard:document.getElementById('runtimeDiagCard'),
+    runtimeDiagBody:document.getElementById('runtimeDiagBody'),
   };
 
   function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify({soundEnabled:state.soundEnabled,instagramTag:state.instagramTag}))}
+  function pushDiag(label, detail=''){
+    try{
+      const stamp = new Date().toLocaleTimeString();
+      state.runtimeDiag.events.unshift(`${stamp} — ${label}${detail ? `: ${detail}` : ''}`);
+      state.runtimeDiag.events = state.runtimeDiag.events.slice(0, 12);
+      renderRuntimeDiag();
+    }catch{}
+  }
+
+  function renderRuntimeDiag(){
+    if(!el.runtimeDiagBody) return;
+    const lines = [];
+    if(state.runtimeDiag.lastFind) lines.push(`lastFind: ${state.runtimeDiag.lastFind}`);
+    if(state.runtimeDiag.lastApi) lines.push(`lastApi: ${state.runtimeDiag.lastApi}`);
+    if(state.runtimeDiag.lastError) lines.push(`lastError: ${state.runtimeDiag.lastError}`);
+    const resp = state.runtimeDiag.lastSessionResponse;
+    if(resp){
+      const code = resp.code || 'n/a';
+      const tableCount = Array.isArray(resp.tables) ? resp.tables.length : Object.keys(resp.tables || {}).length;
+      lines.push(`sessionResponse: code=${code}, tables=${tableCount}`);
+    }
+    lines.push('');
+    lines.push(...(state.runtimeDiag.events || []));
+    el.runtimeDiagBody.innerHTML = `<pre style="white-space:pre-wrap;margin:0;font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">${escapeHtml(lines.join('\n'))}</pre>`;
+  }
+
   function load(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -280,7 +313,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       state.accusationDraft = {killer:null,motive:null,method:null,evidence:null};
       state.timerBaseElapsedSec = 0;
       state.timerBaseCapturedAt = 0;
-    }catch{ startLivePolling(); }
+    }catch(err){ state.runtimeDiag.lastError = err?.message || 'WebSocket failed'; pushDiag('WebSocket failed', state.runtimeDiag.lastError); startLivePolling(); }
   }
 
   function checkForNewUnlocks(privateView){
@@ -298,7 +331,21 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     state.lastUnlockCount = count;
   }
 
-  async function api(path, opts={}){const url=`${state.backendUrl}${path}`; const res=await fetch(url,{headers:{'Content-Type':'application/json'},...opts}); if(!res.ok){const text=await res.text(); throw new Error(text || `Request failed: ${res.status}`)} return res.json();}
+  async function api(path, opts={}){
+    const url=`${state.backendUrl}${path}`;
+    state.runtimeDiag.lastApi = `${opts?.method || 'GET'} ${url}`;
+    pushDiag('API request', state.runtimeDiag.lastApi);
+    const res=await fetch(url,{headers:{'Content-Type':'application/json'},...opts});
+    if(!res.ok){
+      const text=await res.text();
+      state.runtimeDiag.lastError = `HTTP ${res.status} ${text}`;
+      pushDiag('API error', state.runtimeDiag.lastError);
+      throw new Error(text || `Request failed: ${res.status}`);
+    }
+    const data = await res.json();
+    pushDiag('API success', `${opts?.method || 'GET'} ${path}`);
+    return data;
+  }
   function switchScreen(name){state.currentScreen=name; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(`screen-${name}`).classList.add('active'); if(name==='join')renderJoin(); if(name==='home')renderHome(); if(name==='app')renderApp(); save();}
   function normalizePlayers(players){
     if(Array.isArray(players)) return players;
@@ -356,13 +403,18 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
+    state.runtimeDiag.lastFind = code || '(empty)';
+    pushDiag('Find Session clicked', code || '(empty)');
     if(!code){toast('Missing code','Enter the host session code.'); return;}
     const data = await api(`/api/sessions/by-code/${encodeURIComponent(code)}`);
+    state.runtimeDiag.lastSessionResponse = data;
     const tables = normalizeTables(data?.tables);
+    pushDiag('Find Session response', `tables=${tables.length}`);
     state.session = { ...data, tables };
     if(!tables.length){
       toast('No teams found','This session does not have any teams available yet.');
       switchScreen('connect');
+      renderRuntimeDiag();
       return;
     }
     state.tableId = tables[0].tableId;
@@ -371,6 +423,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     renderJoin();
     connectWs();
     startLivePolling();
+    renderRuntimeDiag();
     toast('Session found', data.code);
   }
   async function joinTable(){
@@ -394,10 +447,11 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     const url = `${wsUrlFromHttp(state.backendUrl)}?sessionId=${encodeURIComponent(state.session.sessionId)}`;
     try{
       const ws = new WebSocket(url); state.ws = ws;
-      ws.onopen = () => toast('Connected','Live updates are on.');
+      ws.onopen = () => { pushDiag('WebSocket open'); toast('Connected','Live updates are on.'); };
       ws.onmessage = async (event) => {
         let msg={};
         try{ msg=JSON.parse(event.data); }catch{}
+        pushDiag('WebSocket message', msg.type || 'unknown');
         if(msg.type==='connected') return;
         if(['table_updated','table_started','player_submitted','table_revealed','table_reset','team_message','broadcast_message','help_resolved'].includes(msg.type)){
           if(msg.type==='table_reset' && currentTable()?.tableId===msg.table?.tableId){
@@ -480,8 +534,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         `hostMessages: ${hostMsgCount}`,
         `apps: ${JSON.stringify(counts)}`
       ];
-      el.debugBody.innerHTML = `<pre style="white-space:pre-wrap;margin:0;font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">${escapeHtml(lines.join('
-'))}</pre>`;
+      el.debugBody.innerHTML = `<pre style="white-space:pre-wrap;margin:0;font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">${escapeHtml(lines.join('\\n'))}</pre>`;
     }
   }
   function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
@@ -616,7 +669,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   function roundRect(ctx,x,y,w,h,r){ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();}
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
-  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); renderDebugPanel(); } if(state.currentScreen==='app') renderApp(); save(); }
+  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); renderDebugPanel(); } if(state.currentScreen==='app') renderApp(); renderRuntimeDiag(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
   let livePollHandle = null;
 
@@ -653,6 +706,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     state.accusationDraft = {killer:null,motive:null,method:null,evidence:null};
     state.timerBaseElapsedSec = 0;
     state.timerBaseCapturedAt = 0;
+    pushDiag('Reset Session executed');
     location.reload();
   }
 
@@ -660,6 +714,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     window.__lastCallFindSession = async () => {
       try{
         state.backendUrl = (state.backendUrl || '').trim().replace(/\/$/, '');
+        pushDiag('window.__lastCallFindSession invoked');
         await findSession();
       }catch(err){
         toast('Find session failed', err.message);
@@ -671,6 +726,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       el.findSessionBtn.type = 'button';
       el.findSessionBtn.onclick = (e) => {
         if(e){ e.preventDefault(); e.stopPropagation(); }
+        pushDiag('Find Session button handler fired');
         return window.__lastCallFindSession();
       };
     }
@@ -678,6 +734,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       el.resetSessionBtn.type = 'button';
       el.resetSessionBtn.onclick = (e) => {
         if(e){ e.preventDefault(); e.stopPropagation(); }
+        pushDiag('Reset Session button handler fired');
         return window.__lastCallResetSession();
       };
     }
@@ -692,6 +749,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if(el.helpBtn){ el.helpBtn.onclick = async () => { try { await sendHelpRequest(); } catch(err) { toast('Help request failed', err.message); } }; }
     if(el.testSoundBtn){ el.testSoundBtn.onclick = () => playNotificationSound(); }
     bindConnectButtons();
+    renderRuntimeDiag();
     el.playerNameInput.oninput=()=>{ state.playerName=el.playerNameInput.value.trim(); updateJoinButton(); save(); };
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
     bindHomeGridButtons();
