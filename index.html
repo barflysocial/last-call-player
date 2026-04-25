@@ -94,7 +94,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.22 PLAYER · BUILD 2.5.22 PLAYER</div>
+      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.23 PLAYER · BUILD 2.5.23 PLAYER</div>
     </div>
 
     <section class="screen active" id="screen-connect">
@@ -109,7 +109,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
     <section class="screen" id="screen-join">
       <div class="card">
-        <div class="tiny">Session · BUILD 2.5.22 PLAYER</div>
+        <div class="tiny">Session · BUILD 2.5.23 PLAYER</div>
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
@@ -122,7 +122,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Detective · BUILD 2.5.22 PLAYER</div>
+            <div class="tiny">Detective · BUILD 2.5.23 PLAYER</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -136,7 +136,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="card" id="hostMessageCard" style="display:none">
         <div class="tiny">Host Message</div>
         <div class="card" id="debugCard">
-        <div class="tiny">Debug · BUILD 2.5.22 PLAYER</div>
+        <div class="tiny">Debug · BUILD 2.5.23 PLAYER</div>
         <div class="body" id="debugBody">Waiting for data…</div>
       </div>
 <div class="body" id="hostMessageBody"></div>
@@ -422,7 +422,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     }catch{}
   }
   async function refreshSessionAndPlayer(){ if(!state.session?.sessionId) return; const session=await api(`/api/sessions/${state.session.sessionId}`); state.session=session; if(state.playerId){ try{await refreshPlayerState();}catch{} } else { renderCurrent(); } }
-  function currentPhase(){ return state.privateView?.phase || currentTable()?.phase || 'lobby'; }
+  function currentPhase(){ return currentTable()?.phase || state.privateView?.phase || 'lobby'; }
   function elapsedSec(){
     const startedAt = state.privateView?.startedAt || currentTable()?.startedAt || null;
     if(!startedAt) return 0;
@@ -436,10 +436,10 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   function timeRemainingSec(){ return Math.max(0, 2700 - elapsedSec()); }
   function renderHome(){
     const pv = state.privateView || {};
+    const phase = currentPhase();
     el.heroPlayer.textContent = pv?.player?.playerName || state.playerName || 'Detective';
     el.heroRole.textContent = 'Detective';
-    const phase = currentPhase();
-    el.phaseBadge.textContent = phase === 'lobby' ? 'Investigation' : phase;
+    el.phaseBadge.textContent = phase === 'lobby' ? 'LOBBY' : String(phase).toUpperCase();
     el.timeRemaining.textContent = `Time Left — ${formatClock(timeRemainingSec())}`;
     el.rolePrompt.textContent = phase==='lobby' ? 'Waiting for host to start.' : phase.startsWith('accusation') ? 'Review your strongest clues and submit.' : 'Investigate the evidence.';
 
@@ -457,13 +457,32 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     if (el.homeGrid) {
       const apps = Object.keys(APP_META);
       el.homeGrid.innerHTML = apps.map(appId => {
-        const locked = appId==='accuse' && !phase.startsWith('accusation');
+        const locked = appId==='accuse' && !String(phase).startsWith('accusation');
         const count = unreadCount(appId);
         return `<button type="button" class="icon ${locked ? 'disabled' : ''}" data-open-app="${appId}"><div class="icon-symbol">${APP_META[appId].icon}</div><div class="icon-label">${escapeHtml(APP_META[appId].label)}</div>${count>0?`<div class="badge-count">${count}</div>`:''}</button>`;
       }).join('');
       bindHomeGridButtons();
     }
-    renderDebugPanel();
+
+    if (el.debugBody) {
+      const apps = pv.apps || {};
+      const counts = Object.fromEntries(Object.entries(apps).map(([k,v]) => [k, (v || []).length]));
+      const publicCount = (pv.publicClues || []).length;
+      const hostMsgCount = (pv.hostMessages || []).length;
+      const totalAppCount = Object.values(counts).reduce((a,b) => a + b, 0);
+      const lines = [
+        `phase(current): ${String(phase)}`,
+        `phase(privateView): ${String(pv.phase ?? 'null')}`,
+        `phase(table): ${String(currentTable()?.phase ?? 'null')}`,
+        `elapsedSec: ${String(pv.elapsedSec ?? 'null')}`,
+        `publicClues: ${publicCount}`,
+        `appEntriesTotal: ${totalAppCount}`,
+        `hostMessages: ${hostMsgCount}`,
+        `apps: ${JSON.stringify(counts)}`
+      ];
+      el.debugBody.innerHTML = `<pre style="white-space:pre-wrap;margin:0;font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">${escapeHtml(lines.join('
+'))}</pre>`;
+    }
   }
   function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
   function renderDebugPanel(){
