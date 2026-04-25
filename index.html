@@ -94,7 +94,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.20 PLAYER · BUILD 2.5.20 PLAYER</div>
+      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.22 PLAYER · BUILD 2.5.22 PLAYER</div>
     </div>
 
     <section class="screen active" id="screen-connect">
@@ -109,7 +109,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
 
     <section class="screen" id="screen-join">
       <div class="card">
-        <div class="tiny">Session · BUILD 2.5.20 PLAYER</div>
+        <div class="tiny">Session · BUILD 2.5.22 PLAYER</div>
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
@@ -122,7 +122,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Detective · BUILD 2.5.20 PLAYER</div>
+            <div class="tiny">Detective · BUILD 2.5.22 PLAYER</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -135,7 +135,11 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       </div>
       <div class="card" id="hostMessageCard" style="display:none">
         <div class="tiny">Host Message</div>
-        <div class="body" id="hostMessageBody"></div>
+        <div class="card" id="debugCard">
+        <div class="tiny">Debug · BUILD 2.5.22 PLAYER</div>
+        <div class="body" id="debugBody">Waiting for data…</div>
+      </div>
+<div class="body" id="hostMessageBody"></div>
       </div>
       <div class="card">
         <div class="tiny">Investigation Apps</div>
@@ -240,6 +244,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     clueLaneBody:document.getElementById('clueLaneBody'),
     hostMessageCard:document.getElementById('hostMessageCard'),
     hostMessageBody:document.getElementById('hostMessageBody'),
+    debugCard:document.getElementById('debugCard'),
+    debugBody:document.getElementById('debugBody'),
     homeGrid:document.getElementById('homeGrid'),
     helpBtn:document.getElementById('helpBtn'),
     testSoundBtn:document.getElementById('testSoundBtn'),
@@ -282,7 +288,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     let count = (privateView?.publicClues || []).length;
     Object.values(apps).forEach(arr => count += (arr || []).length);
     count += (privateView?.hostMessages || []).length;
-    if(state.lastUnlockCount && count > state.lastUnlockCount){
+
+    const hadPreviousValue = Number.isFinite(state.lastUnlockCount);
+    if (hadPreviousValue && count > state.lastUnlockCount) {
       playNotificationSound();
       const latestHostMessage = (privateView?.hostMessages || []).slice(-1)[0];
       toast(latestHostMessage?.message ? 'Host message' : 'New clue unlocked', latestHostMessage?.message || '');
@@ -455,8 +463,31 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       }).join('');
       bindHomeGridButtons();
     }
+    renderDebugPanel();
   }
   function unreadCount(appId){ const appEntries=state.privateView?.apps?.[appId] || []; const publicClues=appId==='notes' ? (state.privateView?.publicClues || []) : []; const total=appEntries.length + publicClues.length; return Math.max(0, total - (state.viewed[appId] || 0)); }
+  function renderDebugPanel(){
+    if(!el.debugBody) return;
+    const pv = state.privateView || {};
+    const apps = pv.apps || {};
+    const counts = Object.fromEntries(Object.entries(apps).map(([k,v]) => [k, (v || []).length]));
+    const publicCount = (pv.publicClues || []).length;
+    const hostMsgCount = (pv.hostMessages || []).length;
+    const totalAppCount = Object.values(counts).reduce((a,b) => a + b, 0);
+
+    const lines = [
+      `phase: ${String(currentPhase() || 'unknown')}`,
+      `elapsedSec: ${String(pv.elapsedSec ?? 'null')}`,
+      `playerId: ${String(pv?.player?.playerId || state.playerId || 'missing')}`,
+      `roleLabel: ${String(pv?.player?.roleLabel || 'Detective')}`,
+      `publicClues: ${publicCount}`,
+      `appEntriesTotal: ${totalAppCount}`,
+      `hostMessages: ${hostMsgCount}`,
+      `apps: ${JSON.stringify(counts)}`
+    ];
+
+    el.debugBody.innerHTML = `<pre style="white-space:pre-wrap;margin:0;font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">${escapeHtml(lines.join('\n'))}</pre>`;
+  }
   function bindHomeGridButtons(){
     if(!el.homeGrid) return;
     el.homeGrid.querySelectorAll('[data-open-app]').forEach(btn => {
@@ -566,7 +597,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   function roundRect(ctx,x,y,w,h,r){ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();}
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
-  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); } if(state.currentScreen==='app') renderApp(); save(); }
+  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); renderDebugPanel(); } if(state.currentScreen==='app') renderApp(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
   let livePollHandle = null;
 
