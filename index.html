@@ -94,7 +94,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
         <div id="topClock">00:00</div>
       </div>
       <div class="title">Last Call</div>
-      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.25 PLAYER · BUILD 2.5.25 PLAYER</div>
+      <div class="subtitle">Detective Player App — Unified Evidence · BUILD 2.5.26 PLAYER · BUILD 2.5.26 PLAYER</div>
     </div>
 
     <section class="screen active" id="screen-connect">
@@ -106,27 +106,31 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="findSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallFindSession && window.__lastCallFindSession();return false;">Find Session</button><button class="secondary" id="resetSessionBtn" type="button" onclick="event.preventDefault();event.stopPropagation();window.__lastCallResetSession && window.__lastCallResetSession();return false;">Reset Session</button></div>
       <div class="mini" style="margin-top:12px"><label><input type="checkbox" id="soundToggle" checked style="width:auto;margin-right:6px"> Notification sound on</label></div>
       <div class="card" id="runtimeDiagCard" style="margin-top:12px">
-        <div class="tiny">Runtime Diagnostics · BUILD 2.5.25 PLAYER</div>
+        <div class="tiny">Runtime Diagnostics · BUILD 2.5.26 PLAYER</div>
         <div class="body" id="runtimeDiagBody">Waiting for activity…</div>
       </div>
     </section>
 
     <section class="screen" id="screen-join">
       <div class="card">
-        <div class="tiny">Session · BUILD 2.5.25 PLAYER</div>
+        <div class="tiny">Session · BUILD 2.5.26 PLAYER</div>
         <h2 id="joinSessionTitle">Last Call</h2>
         <div class="body" id="joinSessionMeta"></div>
       </div>
       <div class="field"><div class="label">Detective Name</div><input id="playerNameInput" maxlength="32" placeholder="Enter your detective name" /></div>
       <div class="field"><div class="label">Instagram Tag (optional)</div><input id="instagramInput" maxlength="40" placeholder="@yourhandle" /></div>
       <button id="joinTableBtn" type="button" disabled>Join Investigation</button>
+      <div class="card" id="joinDiagCard" style="margin-top:12px">
+        <div class="tiny">Join Diagnostics · BUILD 2.5.26 PLAYER</div>
+        <div class="body" id="joinDiagBody">Waiting for join activity…</div>
+      </div>
     </section>
 
     <section class="screen" id="screen-home">
       <div class="home-hero">
         <div class="hero-grid">
           <div>
-            <div class="tiny">Detective · BUILD 2.5.25 PLAYER</div>
+            <div class="tiny">Detective · BUILD 2.5.26 PLAYER</div>
             <div class="title" id="heroPlayer"></div>
             <div class="subtitle" id="heroRole"></div>
           </div>
@@ -140,7 +144,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       <div class="card" id="hostMessageCard" style="display:none">
         <div class="tiny">Host Message</div>
         <div class="card" id="debugCard">
-        <div class="tiny">Debug · BUILD 2.5.25 PLAYER</div>
+        <div class="tiny">Debug · BUILD 2.5.26 PLAYER</div>
         <div class="body" id="debugBody">Waiting for data…</div>
       </div>
 <div class="body" id="hostMessageBody"></div>
@@ -224,7 +228,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     lastUnlockCount:0,
     timerBaseElapsedSec: 0,
     timerBaseCapturedAt: 0,
-    runtimeDiag:{events:[], lastApi:null, lastError:null, lastFind:null, lastSessionResponse:null}
+    runtimeDiag:{events:[], lastApi:null, lastError:null, lastFind:null, lastSessionResponse:null},
+    joinDiag:{events:[], lastError:null, lastJoinRequest:null}
   };
   const el = {
     notificationStack:document.getElementById('notificationStack'),
@@ -240,6 +245,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     playerNameInput:document.getElementById('playerNameInput'),
     instagramInput:document.getElementById('instagramInput'),
     joinTableBtn:document.getElementById('joinTableBtn'),
+    joinDiagCard:document.getElementById('joinDiagCard'),
+    joinDiagBody:document.getElementById('joinDiagBody'),
     heroPlayer:document.getElementById('heroPlayer'),
     heroRole:document.getElementById('heroRole'),
     phaseBadge:document.getElementById('phaseBadge'),
@@ -274,7 +281,32 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       state.runtimeDiag.events.unshift(`${stamp} — ${label}${detail ? `: ${detail}` : ''}`);
       state.runtimeDiag.events = state.runtimeDiag.events.slice(0, 12);
       renderRuntimeDiag();
+    renderJoinDiag();
     }catch{}
+  }
+
+  function pushJoinDiag(label, detail=''){
+    try{
+      const stamp = new Date().toLocaleTimeString();
+      state.joinDiag.events.unshift(`${stamp} — ${label}${detail ? `: ${detail}` : ''}`);
+      state.joinDiag.events = state.joinDiag.events.slice(0, 12);
+      renderJoinDiag();
+    }catch{}
+  }
+
+  function renderJoinDiag(){
+    if(!el.joinDiagBody) return;
+    const lines = [
+      `buttonDisabled: ${String(!!el.joinTableBtn?.disabled)}`,
+      `playerName: ${String(state.playerName || '')}`,
+      `tableId: ${String(state.tableId || '')}`,
+      `sessionId: ${String(state.session?.sessionId || '')}`,
+      `lastJoinRequest: ${String(state.joinDiag.lastJoinRequest || '')}`,
+      `lastError: ${String(state.joinDiag.lastError || '')}`,
+      ''
+    ];
+    lines.push(...(state.joinDiag.events || []));
+    el.joinDiagBody.innerHTML = `<pre style="white-space:pre-wrap;margin:0;font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">${escapeHtml(lines.join('\n'))}</pre>`;
   }
 
   function renderRuntimeDiag(){
@@ -391,7 +423,9 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.joinSessionMeta.innerHTML = `<div class="lobby-meta"><div><strong>Session Code:</strong> ${escapeHtml(state.session.code)}</div><div><strong>Team:</strong> ${escapeHtml(table?.label || '—')}</div><div><strong>Perspective:</strong> Detective</div><div><strong>Status:</strong> Waiting for host to start</div></div>`;
     el.playerNameInput.value = state.playerName || '';
     el.instagramInput.value = state.instagramTag || '';
+    pushJoinDiag('renderJoin', `tables=${tables.length}, tableId=${state.tableId || '(empty)'}`);
     updateJoinButton();
+    renderJoinDiag();
   }
   
   function updateJoinButton(){
@@ -400,6 +434,8 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
       el.joinTableBtn.disabled = !ok;
       el.joinTableBtn.textContent = 'Join Investigation';
     }
+    pushJoinDiag('updateJoinButton', `ok=${ok}, playerName=${state.playerName || '(empty)'}, tableId=${state.tableId || '(empty)'}`);
+    renderJoinDiag();
   }
   async function findSession(){
     const code = el.sessionCodeInput.value.trim().toUpperCase();
@@ -427,10 +463,13 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     toast('Session found', data.code);
   }
   async function joinTable(){
+    state.joinDiag.lastJoinRequest = `POST /api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`;
+    pushJoinDiag('joinTable called', state.joinDiag.lastJoinRequest);
     const data = await api(`/api/sessions/${state.session.sessionId}/tables/${state.tableId}/join`, {
       method:'POST',
       body:JSON.stringify({playerName:state.playerName, instagramTag:state.instagramTag})
     });
+    pushJoinDiag('joinTable success', `playerId=${data?.player?.playerId || 'missing'}`);
     state.playerId = data.player.playerId;
     state.privateView = data;
     state.timerBaseElapsedSec = Number(data?.elapsedSec || 0);
@@ -669,7 +708,7 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
   }
   function roundRect(ctx,x,y,w,h,r){ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();}
   function wrapCenterText(ctx,text,centerX,y,maxWidth,lineHeight){const words=String(text).split(' '); let line=''; for(let i=0;i<words.length;i++){const test=line+words[i]+' '; if(ctx.measureText(test).width>maxWidth && i>0){ctx.fillText(line.trim(),centerX,y); line=words[i]+' '; y+=lineHeight;} else {line=test;}} if(line.trim()) ctx.fillText(line.trim(),centerX,y);}
-  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join') renderJoin(); if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); renderDebugPanel(); } if(state.currentScreen==='app') renderApp(); renderRuntimeDiag(); save(); }
+  function renderCurrent(){ updateTopbar(); if(state.currentScreen==='join'){ renderJoin(); renderJoinDiag(); } if(state.currentScreen==='home'){ renderHome(); bindHomeGridButtons(); renderDebugPanel(); } if(state.currentScreen==='app') renderApp(); renderRuntimeDiag(); save(); }
   function updateTopbar(){ el.topPhase.textContent=currentPhase(); el.topClock.textContent=formatClock(elapsedSec()); }
   let livePollHandle = null;
 
@@ -754,11 +793,20 @@ input,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255
     el.instagramInput.oninput=()=>{ state.instagramTag=el.instagramInput.value.trim(); save(); };
     bindHomeGridButtons();
     el.joinTableBtn.onclick=async()=>{
-      if(!state.playerName) return toast('Missing name','Enter your name first.');
-      if(!state.tableId) return toast('Missing team','No team is selected for this session.');
+      pushJoinDiag('Join button clicked');
+      if(!state.playerName){
+        pushJoinDiag('blocked', 'missing playerName');
+        return toast('Missing name','Enter your name first.');
+      }
+      if(!state.tableId){
+        pushJoinDiag('blocked', 'missing tableId');
+        return toast('Missing team','No team is selected for this session.');
+      }
       try{
         await joinTable();
       } catch(err){
+        state.joinDiag.lastError = err?.message || 'Join request failed.';
+        pushJoinDiag('join failed', state.joinDiag.lastError);
         toast('Join failed', err.message || 'Join request failed.');
       }
     };
